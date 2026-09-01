@@ -32,7 +32,8 @@ import {
   FileCheck2,
   CheckSquare,
   Square,
-  CheckCheck
+  CheckCheck,
+  ChevronRight
 } from 'lucide-react';
 import { Client, Expense, AppTab, DatabaseConfig, UserAuth } from './types';
 import { 
@@ -46,7 +47,7 @@ import {
   formatYearMonth,
   isBillingIssuedForMonth
 } from './utils/clientHelpers';
-import { downloadBackupFile, syncDataToCloud, scheduleAutoSync } from './utils/cloudSync';
+import { downloadBackupFile, syncDataToCloud, scheduleAutoSync, fetchCloudData } from './utils/cloudSync';
 import MonthBar from './components/MonthBar';
 import StatsSection from './components/StatsSection';
 import ClientFormModal from './components/ClientFormModal';
@@ -59,6 +60,9 @@ import LoginView from './components/LoginView';
 import TopHeader from './components/TopHeader';
 import SidebarNav from './components/SidebarNav';
 import VercelSyncView from './components/VercelSyncView';
+import MobileBottomNav from './components/MobileBottomNav';
+import ClientDetailModal from './components/ClientDetailModal';
+import { ClientCard } from './components/ClientCard';
 
 // Data de "hoje" ancorada de acordo com o ambiente da aplicação (Junho de 2026)
 const TODAY_STR = '2026-06-04';
@@ -224,6 +228,10 @@ export default function App() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentClient, setPaymentClient] = useState<Client | null>(null);
 
+  // Modal de Detalhes do Cliente (especialmente otimizado para mobile)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedDetailClient, setSelectedDetailClient] = useState<Client | null>(null);
+
   // Modal de Confirmação Customizado para substituir os dialogos nativos de exclusao e estorno
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
     isOpen: boolean;
@@ -257,6 +265,54 @@ export default function App() {
 
   // Mensagens de ajuda / Feedback rápido
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+
+  // Sincronização e Busca Automática da Nuvem Vercel na Abertura (PC e Celular)
+  useEffect(() => {
+    async function initCloudSync() {
+      try {
+        setIsCloudSyncing(true);
+        const cloudResult = await fetchCloudData();
+        if (cloudResult.success && cloudResult.data && cloudResult.data.clients && cloudResult.data.clients.length > 0) {
+          const localSaved = localStorage.getItem('contr_clientes_data');
+          // Se não houver dados locais, ou se o cloud tiver dados reais, atualiza
+          if (!localSaved || JSON.parse(localSaved).length === 0 || cloudResult.data.clients.length > 0) {
+            setClients(cloudResult.data.clients);
+            if (cloudResult.data.expenses && Array.isArray(cloudResult.data.expenses)) {
+              setExpenses(cloudResult.data.expenses);
+            }
+            if (cloudResult.data.expenseCategories && Array.isArray(cloudResult.data.expenseCategories)) {
+              setExpCategories(cloudResult.data.expenseCategories);
+            }
+            showToast(`✓ Base sincronizada com sucesso (${cloudResult.data.clients.length} clientes carregados da nuvem)`, 'success');
+          }
+        }
+      } catch (e) {
+        console.warn('Sincronização de nuvem em segundo plano:', e);
+      } finally {
+        setIsCloudSyncing(false);
+      }
+    }
+
+    initCloudSync();
+  }, []);
+
+  // Sincronização Manual sob Demanda (1 Clique para enviar do PC ao Celular)
+  const handleManualSync = async () => {
+    setIsCloudSyncing(true);
+    try {
+      const res = await syncDataToCloud(clients, expenses, expCategories, dbConfig, currentUser.name, currentUser.email);
+      if (res.success) {
+        showToast('✓ Dados da sua máquina sincronizados no JSON da Vercel e prontos no Celular!', 'success');
+      } else {
+        showToast('Aviso: ' + res.message, 'info');
+      }
+    } catch (e: any) {
+      showToast('Erro ao sincronizar com nuvem: ' + e?.message, 'error');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
 
   // Persistir clientes no localStorage e agendar sincronização automática com a Vercel
   useEffect(() => {
@@ -935,6 +991,8 @@ export default function App() {
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onLogout={handleLogout}
         onOpenSyncTab={() => setActiveTab('sync')}
+        isSyncing={isCloudSyncing}
+        onTriggerSync={handleManualSync}
       />
 
       {/* Banner Informativo Superior (estilo da imagem com botão de fechar) */}
@@ -962,7 +1020,7 @@ export default function App() {
       )}
 
       {/* Painel Central com Layout Responsivo de 2 Colunas (Menu Lateral + Área de Conteúdo) */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-4 relative z-10 overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-3 lg:gap-4 relative z-10 overflow-hidden pb-14 sm:pb-16 lg:pb-5">
         
         {/* Coluna Esquerda: Menu Lateral de Ações e Auditoria */}
         <SidebarNav 
@@ -1221,233 +1279,38 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <div id="client-cards-container" className="space-y-2.5 relative z-10">
-                {filteredClients.map((client) => {
-                  const currentStatus = getClientStatusForMonth(client, selectedYearMonth, TODAY_STR);
-                  const customMonthPayment = client.paymentHistory.find(p => p.yearMonth === selectedYearMonth);
-                  const isIssued = isBillingIssuedForMonth(client, selectedYearMonth);
-                  
-                  // Calcular datas específicas para exibição do vencimento desse cliente no mês selecionado
-                  const calculatedDueStr = getDueDateForMonth(client.dueDateDay, selectedYearMonth);
-                  const formattedRealDueDate = formatDate(calculatedDueStr);
-
-                  return (
-                    <div 
-                      id={`client-row-${client.id}`}
-                      key={client.id}
-                      className={`theme-card rounded-xl p-3.5 transition-all duration-300 hover:scale-[1.002] flex flex-col lg:flex-row lg:items-center justify-between gap-3 ${
-                        client.status === 'inativo' ? 'opacity-40' : ''
-                      } ${
-                        currentStatus === 'pago' 
-                          ? 'border-l-4 border-l-emerald-500/80' 
-                          : currentStatus === 'atrasado' 
-                            ? 'border-l-4 border-l-rose-500/80' 
-                            : currentStatus === 'pendente'
-                              ? 'border-l-4 border-l-amber-500/80'
-                              : 'border-l-4 border-l-slate-400'
-                      }`}
-                    >
-                      
-                      {/* Dados Básicos Cliente */}
-                      <div className="flex-1 space-y-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-extrabold text-sm theme-title truncate" title={client.name}>
-                            {client.name}
-                          </h4>
-                          
-                          {/* Tipo de Contrato Badge */}
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                            client.contractType === 'recorrente' 
-                              ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20' 
-                              : 'bg-fuchsia-100 dark:bg-fuchsia-950/35 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-300/35'
-                          }`}>
-                            {client.contractType === 'recorrente' ? 'Recorrente' : 'Mensal'}
-                          </span>
-
-                          {/* Inativo badge */}
-                          {client.status === 'inativo' && (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold theme-btn-secondary">
-                              Inativo
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] theme-text-secondary">
-                          <span>Vencimento: <strong className="theme-text-primary font-semibold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong></span>
-                          <span className="inline-block h-1 w-1 rounded-full bg-slate-400/20 hidden md:block"></span>
-                          <span>Último pagamento: <strong className="theme-text-primary font-semibold">{formatDate(client.lastPaymentDate)}</strong></span>
-                        </div>
-
-                        {/* Observações / Notas */}
-                        {client.notes && (
-                          <div 
-                            className="mt-1 theme-text-secondary text-[11px] rounded-lg p-2 border flex items-start gap-1.5 max-w-xl transition-all duration-300"
-                            style={{ backgroundColor: 'var(--baixa-bg)', borderColor: 'var(--baixa-border)' }}
-                          >
-                            <FileText className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
-                            <p className="italic leading-normal truncate-2-lines">{client.notes}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Informações Financeiras & Valor */}
-                      <div 
-                        className="flex flex-col sm:flex-row lg:items-center gap-3 sm:gap-5 lg:ml-3 border-t lg:border-t-0 pt-2 lg:pt-0 shrink-0 select-none transition-colors duration-300"
-                        style={{ borderColor: 'var(--card-border)' }}
-                      >
-                        
-                        {/* Valor cobrado */}
-                        <div className="min-w-[100px]">
-                          <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block">Valor Mensal</span>
-                          <span className="text-base font-black theme-title">{formatCurrency(client.value)}</span>
-                        </div>
-
-                        {/* Status de Emissão da Cobrança */}
-                        <div className="min-w-[125px]">
-                          <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block mb-1">Cobrança Mês</span>
-                          {currentStatus === 'sem_cobranca' ? (
-                            <span className="text-[10px] theme-text-secondary italic">Não aplicável</span>
-                          ) : (
-                            <button
-                              id={`toggle-issued-btn-${client.id}`}
-                              onClick={() => handleToggleBillingIssued(client.id, selectedYearMonth)}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border select-none active:scale-95 ${
-                                isIssued
-                                  ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/25 shadow-xs'
-                                  : 'bg-slate-100 dark:bg-white/5 theme-text-secondary border-slate-300 dark:border-white/10 hover:border-indigo-400/50 hover:text-indigo-400'
-                              }`}
-                              title={
-                                isIssued
-                                  ? `Cobrança de ${formatYearMonth(selectedYearMonth)} marcada como EMITIDA. Clique para desmarcar.`
-                                  : `Clique para marcar a cobrança de ${formatYearMonth(selectedYearMonth)} como EMITIDA.`
-                              }
-                            >
-                              {isIssued ? (
-                                <>
-                                  <CheckSquare className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                  <span>Emitida</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span>Não emitida</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* status específico do mês selecionado */}
-                        <div className="min-w-[130px]">
-                          <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block mb-1">Status Pagamento</span>
-                          
-                          {currentStatus === 'pago' ? (
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 w-max">
-                                <CheckCircle2 className="w-3 h-3" /> Pago
-                              </span>
-                              {customMonthPayment && (
-                                <span className="text-[9px] theme-text-secondary mt-0.5 font-medium">
-                                  {formatDate(customMonthPayment.paymentDate)}
-                                  {customMonthPayment.amount !== client.value && ` (${formatCurrency(customMonthPayment.amount)})`}
-                                </span>
-                              )}
-                            </div>
-                          ) : currentStatus === 'atrasado' ? (
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-rose-600 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 w-max">
-                                <AlertCircle className="w-3 h-3" /> Atrasado
-                              </span>
-                              <span className="text-[9px] text-rose-600 dark:text-rose-450 font-semibold mt-0.5">
-                                Venceu: {formattedRealDueDate}
-                              </span>
-                            </div>
-                          ) : currentStatus === 'pendente' ? (
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 w-max">
-                                <Clock className="w-3 h-3" /> Pendente
-                              </span>
-                              <span className="text-[9px] theme-text-secondary mt-0.5 font-medium">
-                                Vence: {formattedRealDueDate}
-                              </span>
-                            </div>
-                          ) : currentStatus === 'sem_cobranca' ? (
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/15 w-max">
-                                <Clock className="w-3 h-3 text-slate-400" /> Sem faturamento
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold theme-text-secondary bg-slate-500/10 border border-slate-400/20 w-max">
-                              Sem cobrança
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Botões de Ações Financeiras */}
-                        <div className="flex items-center gap-2 pt-1 sm:pt-0">
-                          {currentStatus === 'pago' ? (
-                            <button
-                              id={`undo-pay-btn-${client.id}`}
-                              onClick={() => handleUndoPayment(client.id, selectedYearMonth)}
-                              className="px-3 py-2 theme-btn-secondary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                              title="Reverter confirmação de recebimento"
-                            >
-                              <Undo2 className="w-3.5 h-3.5" /> Estornar
-                            </button>
-                          ) : currentStatus === 'sem_cobranca' ? (
-                            <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold italic select-none py-2 px-1">
-                              Contrato futuro
-                            </span>
-                          ) : (
-                            <button
-                              id={`pay-btn-${client.id}`}
-                              onClick={() => {
-                                setPaymentClient(client);
-                                setIsPaymentModalOpen(true);
-                              }}
-                              className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/10 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                              title="Registrar recebimento"
-                            >
-                              <Check className="w-3.5 h-3.5" /> Dar Baixa
-                            </button>
-                          )}
-
-                          {/* Dropdown de Edição / Deleção */}
-                          <div 
-                            className="flex items-center gap-1 ml-1 border-l pl-2 transition-colors duration-300"
-                            style={{ borderColor: 'var(--card-border)' }}
-                          >
-                            <button
-                              id={`edit-client-btn-${client.id}`}
-                              onClick={() => {
-                                setEditingClient(client);
-                                setIsClientModalOpen(true);
-                              }}
-                              className="p-1.5 hover:bg-slate-400/10 dark:hover:bg-white/10 rounded-lg theme-text-secondary hover:text-indigo-500 dark:hover:text-white transition-colors cursor-pointer"
-                              title="Editar contrato de cliente"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              id={`delete-client-btn-${client.id}`}
-                              onClick={() => handleDeleteClient(client.id, client.name)}
-                              className="p-1.5 hover:bg-rose-500/10 rounded-lg theme-text-secondary hover:text-rose-500 transition-colors cursor-pointer"
-                              title="Excluir do sistema"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-                  );
-                  })}
-                </div>
-              )}
+              <div id="client-cards-container" className="space-y-2 lg:space-y-2.5 relative z-10">
+                {filteredClients.map((client) => (
+                  <ClientCard
+                    key={client.id}
+                    client={client}
+                    selectedYearMonth={selectedYearMonth}
+                    todayStr={TODAY_STR}
+                    onSelectDetail={(c) => {
+                      setSelectedDetailClient(c);
+                      setIsDetailModalOpen(true);
+                    }}
+                    onOpenPayment={(c) => {
+                      setPaymentClient(c);
+                      setIsPaymentModalOpen(true);
+                    }}
+                    onUndoPayment={handleUndoPayment}
+                    onToggleIssued={handleToggleBillingIssued}
+                    onEditClient={(c) => {
+                      setEditingClient(c);
+                      setIsClientModalOpen(true);
+                    }}
+                    onDeleteClient={handleDeleteClient}
+                    getClientStatusForMonth={getClientStatusForMonth}
+                    isBillingIssuedForMonth={isBillingIssuedForMonth}
+                    getDueDateForMonth={getDueDateForMonth}
+                    formatCurrency={formatCurrency}
+                    formatDate={formatDate}
+                    formatYearMonth={formatYearMonth}
+                  />
+                ))}
+              </div>
+            )}
             </>
           ) : (
             <div id="expenses-tab-container" className="space-y-3.5 relative z-10 animate-fade-in">
@@ -1981,16 +1844,16 @@ export default function App() {
       </div>
 
 
-      {/* Ajuda de utilização no rodapé */}
+      {/* Ajuda de utilização no rodapé (Apenas desktop para evitar sobreposição mobile) */}
       <footer 
-        className="py-5 text-center text-xs theme-text-secondary select-none relative z-10 theme-footer transition-all duration-300 shrink-0"
+        className="hidden lg:block py-3 text-center text-xs theme-text-secondary select-none relative z-10 theme-footer transition-all duration-300 shrink-0"
       >
-        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="flex items-center justify-center gap-1.5 font-medium">
-            <HelpCircle className="w-4 h-4 text-indigo-400" />
+        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-2">
+          <p className="flex items-center justify-center gap-1.5 font-medium text-[11px]">
+            <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
             Clique em qualquer mês para exibir o faturamento e pendências correspondentes.
           </p>
-          <p className="font-semibold text-slate-500">
+          <p className="font-semibold text-slate-500 text-[11px]">
             Controle de Clientes © 2026 - Versão do Administrador
           </p>
         </div>
@@ -2030,6 +1893,38 @@ export default function App() {
         isDanger={confirmModalConfig.isDanger}
         onClose={() => setConfirmModalConfig(prev => ({ ...prev, isOpen: false }))}
         onConfirm={confirmModalConfig.onConfirm}
+      />
+
+      {/* Modal de Detalhes Completos do Cliente (Aberto ao tocar nos cards no modo Mobile) */}
+      <ClientDetailModal
+        isOpen={isDetailModalOpen}
+        client={selectedDetailClient}
+        selectedYearMonth={selectedYearMonth}
+        todayStr={TODAY_STR}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedDetailClient(null);
+        }}
+        onOpenPaymentModal={(clientToPay) => {
+          setIsDetailModalOpen(false);
+          setPaymentClient(clientToPay);
+          setIsPaymentModalOpen(true);
+        }}
+        onUndoPayment={(clientId, yearMonth) => {
+          handleUndoPayment(clientId, yearMonth);
+        }}
+        onToggleBillingIssued={(clientId, yearMonth) => {
+          handleToggleBillingIssued(clientId, yearMonth);
+        }}
+        onEditClient={(clientToEdit) => {
+          setIsDetailModalOpen(false);
+          setEditingClient(clientToEdit);
+          setIsClientModalOpen(true);
+        }}
+        onDeleteClient={(clientId, clientName) => {
+          setIsDetailModalOpen(false);
+          handleDeleteClient(clientId, clientName);
+        }}
       />
 
       {/* Modal de Gerenciamento de Categorias de Despesa */}
@@ -2289,6 +2184,27 @@ export default function App() {
           setIsDbNotFoundModalOpen(false);
           setIsSettingsModalOpen(true);
         }}
+      />
+
+      {/* Barra de Navegação Inferior Fixa para Smartphones / Mobile */}
+      <MobileBottomNav 
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onOpenNewClientModal={() => {
+          setEditingClient(null);
+          setIsClientModalOpen(true);
+        }}
+        onOpenNewExpenseModal={() => {
+          setActiveTab('despesas');
+          setExpId(null);
+          setExpDescription('');
+          setExpValue('');
+          setExpNotes('');
+        }}
+        onQuickSync={handleManualSync}
+        isSyncing={isCloudSyncing}
+        clientsCount={clients.length}
+        expensesCount={expenses.length}
       />
 
     </div>

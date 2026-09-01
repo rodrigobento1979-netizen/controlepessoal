@@ -20,6 +20,8 @@ export interface Client {
   issuedBillingMonths?: string[]; // Meses ("YYYY-MM") onde a cobrança/fatura foi emitida ou gerada
 }
 
+export type ClientPaymentStatus = 'pago' | 'atrasado' | 'pendente' | 'sem_cobranca';
+
 export type ExpensePayer = 'Rodrigo' | 'Aryadner';
 
 export interface Expense {

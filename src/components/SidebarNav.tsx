@@ -34,7 +34,7 @@ export default function SidebarNav({
   expensesCount,
 }: SidebarNavProps) {
   return (
-    <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-3">
+    <aside className="hidden lg:flex lg:w-72 shrink-0 flex-col gap-3">
       
       {/* Título de Seção "AÇÕES PRINCIPAIS & AUDITORIA" igual à imagem */}
       <div className="flex items-center justify-between px-1">
