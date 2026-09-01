@@ -168,23 +168,17 @@
   color: var(--text-title);
 }
 
-/* Prevenir rolagem/scroll horizontal lateral e evitar múltiplos scrolls verticais na janela */
+/* Permitir rolagem vertical natural na janela sem bloqueios */
 html, body, #root {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: 100% !important;
-  max-height: 100vh !important;
-  overflow: hidden !important; /* Toda a janela é travada para evitar barra de scroll dupla */
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
   box-sizing: border-box;
 }
 
-*, *:before, *:after {
-  box-sizing: inherit;
-}
-
 body {
+  overflow-x: hidden;
   background-color: var(--bg-color);
   color: var(--text-color);
   transition: background-color 300ms, color 300ms;

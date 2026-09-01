@@ -21,11 +21,11 @@ interface ClientCardProps {
   onSelectDetail: (client: Client) => void;
   onOpenPayment: (client: Client) => void;
   onUndoPayment: (clientId: string, yearMonth: string) => void;
-  onToggleIssued: (clientId: string, yearMonth: string) => void;
+  onToggleIssued?: (clientId: string, yearMonth: string) => void;
   onEditClient: (client: Client) => void;
   onDeleteClient: (clientId: string, clientName: string) => void;
   getClientStatusForMonth: (client: Client, yearMonth: string, todayStr: string) => ClientPaymentStatus;
-  isBillingIssuedForMonth: (client: Client, yearMonth: string) => boolean;
+  isBillingIssuedForMonth?: (client: Client, yearMonth: string) => boolean;
   getDueDateForMonth: (day: number, yearMonth: string) => string;
   formatCurrency: (val: number) => string;
   formatDate: (val: string | null) => string;
@@ -39,19 +39,15 @@ export const ClientCard: React.FC<ClientCardProps> = ({
   onSelectDetail,
   onOpenPayment,
   onUndoPayment,
-  onToggleIssued,
   onEditClient,
   onDeleteClient,
   getClientStatusForMonth,
-  isBillingIssuedForMonth,
   getDueDateForMonth,
   formatCurrency,
   formatDate,
-  formatYearMonth
 }) => {
   const currentStatus = getClientStatusForMonth(client, selectedYearMonth, todayStr);
   const customMonthPayment = client.paymentHistory.find(p => p.yearMonth === selectedYearMonth);
-  const isIssued = isBillingIssuedForMonth(client, selectedYearMonth);
   
   const calculatedDueStr = getDueDateForMonth(client.dueDateDay, selectedYearMonth);
   const formattedRealDueDate = formatDate(calculatedDueStr);
@@ -90,12 +86,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 text-[10px] theme-text-secondary">
-            <span>Venc: <strong className="theme-text-primary font-semibold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong></span>
-            {isIssued && (
-              <span className="text-indigo-400 font-bold flex items-center gap-0.5">
-                • Emitida
-              </span>
-            )}
+            <span>Venc: <strong className="theme-text-primary font-semibold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong> ({formattedRealDueDate})</span>
           </div>
         </div>
 
@@ -203,7 +194,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] theme-text-secondary">
-            <span>Vencimento: <strong className="theme-text-primary font-semibold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong></span>
+            <span>Vencimento: <strong className="theme-text-primary font-bold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong> ({formattedRealDueDate})</span>
             <span className="inline-block h-1 w-1 rounded-full bg-slate-400/20 hidden md:block"></span>
             <span>Último pagamento: <strong className="theme-text-primary font-semibold">{formatDate(client.lastPaymentDate)}</strong></span>
           </div>
@@ -222,49 +213,14 @@ export const ClientCard: React.FC<ClientCardProps> = ({
 
         {/* Informações Financeiras & Valor */}
         <div 
-          className="flex flex-col sm:flex-row lg:items-center gap-3 sm:gap-5 lg:ml-3 border-t lg:border-t-0 pt-2 lg:pt-0 shrink-0 select-none transition-colors duration-300"
+          className="flex flex-col sm:flex-row lg:items-center gap-4 sm:gap-6 lg:ml-3 border-t lg:border-t-0 pt-2 lg:pt-0 shrink-0 select-none transition-colors duration-300"
           style={{ borderColor: 'var(--card-border)' }}
         >
           
           {/* Valor cobrado */}
-          <div className="min-w-[100px]">
+          <div className="min-w-[105px]">
             <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block">Valor Mensal</span>
             <span className="text-base font-black theme-title">{formatCurrency(client.value)}</span>
-          </div>
-
-          {/* Status de Emissão da Cobrança */}
-          <div className="min-w-[125px]">
-            <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block mb-1">Cobrança Mês</span>
-            {currentStatus === 'sem_cobranca' ? (
-              <span className="text-[10px] theme-text-secondary italic">Não aplicável</span>
-            ) : (
-              <button
-                id={`toggle-issued-btn-${client.id}`}
-                onClick={() => onToggleIssued(client.id, selectedYearMonth)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border select-none active:scale-95 ${
-                  isIssued
-                    ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/25 shadow-xs'
-                    : 'bg-slate-100 dark:bg-white/5 theme-text-secondary border-slate-300 dark:border-white/10 hover:border-indigo-400/50 hover:text-indigo-400'
-                }`}
-                title={
-                  isIssued
-                    ? `Cobrança de ${formatYearMonth(selectedYearMonth)} marcada como EMITIDA. Clique para desmarcar.`
-                    : `Clique para marcar a cobrança de ${formatYearMonth(selectedYearMonth)} como EMITIDA.`
-                }
-              >
-                {isIssued ? (
-                  <>
-                    <CheckSquare className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>Emitida</span>
-                  </>
-                ) : (
-                  <>
-                    <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>Não emitida</span>
-                  </>
-                )}
-              </button>
-            )}
           </div>
 
           {/* status específico do mês selecionado */}
@@ -273,7 +229,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
             
             {currentStatus === 'pago' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 w-max">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 w-max">
                   <CheckCircle2 className="w-3 h-3" /> Pago
                 </span>
                 {customMonthPayment && (
@@ -285,7 +241,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
               </div>
             ) : currentStatus === 'atrasado' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-rose-600 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 w-max">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-rose-600 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 w-max">
                   <AlertCircle className="w-3 h-3" /> Atrasado
                 </span>
                 <span className="text-[9px] text-rose-600 dark:text-rose-450 font-semibold mt-0.5">
@@ -294,7 +250,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
               </div>
             ) : currentStatus === 'pendente' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 w-max">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 w-max">
                   <Clock className="w-3 h-3" /> Pendente
                 </span>
                 <span className="text-[9px] theme-text-secondary mt-0.5 font-medium">
@@ -303,12 +259,12 @@ export const ClientCard: React.FC<ClientCardProps> = ({
               </div>
             ) : currentStatus === 'sem_cobranca' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/15 w-max">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/15 w-max">
                   <Clock className="w-3 h-3 text-slate-400" /> Sem faturamento
                 </span>
               </div>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold theme-text-secondary bg-slate-500/10 border border-slate-400/20 w-max">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-text-secondary bg-slate-500/10 border border-slate-400/20 w-max">
                 Sem cobrança
               </span>
             )}
@@ -320,7 +276,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
               <button
                 id={`undo-pay-btn-${client.id}`}
                 onClick={() => onUndoPayment(client.id, selectedYearMonth)}
-                className="px-3 py-2 theme-btn-secondary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-2 theme-btn-secondary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:border-indigo-400"
                 title="Reverter confirmação de recebimento"
               >
                 <Undo2 className="w-3.5 h-3.5" /> Estornar
@@ -333,14 +289,14 @@ export const ClientCard: React.FC<ClientCardProps> = ({
               <button
                 id={`pay-btn-${client.id}`}
                 onClick={() => onOpenPayment(client)}
-                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/10 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/10 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 title="Registrar recebimento"
               >
-                <Check className="w-3.5 h-3.5" /> Dar Baixa
+                <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Dar Baixa
               </button>
             )}
 
-            {/* Dropdown de Edição / Deleção */}
+            {/* Ações de Edição e Exclusão */}
             <div 
               className="flex items-center gap-1 ml-1 border-l pl-2 transition-colors duration-300"
               style={{ borderColor: 'var(--card-border)' }}

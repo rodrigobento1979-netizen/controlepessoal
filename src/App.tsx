@@ -129,11 +129,9 @@ export default function App() {
   });
 
   const [selectedYearMonth, setSelectedYearMonth] = useState('2026-06');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'todos' | 'recorrente' | 'mensal'>('todos');
+  const [filterDueDate, setFilterDueDate] = useState<string>('todos');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'pago' | 'pendente' | 'atrasado'>('todos');
-  const [filterIssued, setFilterIssued] = useState<'todos' | 'emitida' | 'nao_emitida'>('todos');
-  const [sortBy, setSortBy] = useState<'padrao' | 'nome' | 'recebimento'>('padrao');
+  const [sortBy, setSortBy] = useState<'vencimento' | 'nome' | 'padrao'>('vencimento');
 
   // --- Estados do Módulo e Navegação ---
   const [activeTab, setActiveTab] = useState<AppTab>('clientes');
@@ -854,26 +852,25 @@ export default function App() {
   // --- Filtragem dos Clientes para Exibição ---
   const filteredClients = useMemo(() => {
     const filtered = clients.filter(c => {
-      // 1. Filtrar pela busca por nome
-      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchesSearch) return false;
+      // 1. Filtrar pelo vencimento (dia)
+      if (filterDueDate !== 'todos') {
+        if (filterDueDate === '1-10') {
+          if (c.dueDateDay < 1 || c.dueDateDay > 10) return false;
+        } else if (filterDueDate === '11-20') {
+          if (c.dueDateDay < 11 || c.dueDateDay > 20) return false;
+        } else if (filterDueDate === '21-31') {
+          if (c.dueDateDay < 21 || c.dueDateDay > 31) return false;
+        } else {
+          // Dia específico (ex: "5", "10", "15")
+          if (c.dueDateDay !== Number(filterDueDate)) return false;
+        }
+      }
 
-      // 2. Filtrar pelo tipo de cobrança (Recorrente / Mensal)
-      if (filterType === 'recorrente' && c.contractType !== 'recorrente') return false;
-      if (filterType === 'mensal' && c.contractType !== 'mensal') return false;
-
-      // 3. Filtrar pelo status de pagamento do mês selecionado
+      // 2. Filtrar pelo status de pagamento do mês selecionado
       const currentMonthStatus = getClientStatusForMonth(c, selectedYearMonth, TODAY_STR);
       if (filterStatus === 'pago' && currentMonthStatus !== 'pago') return false;
       if (filterStatus === 'pendente' && currentMonthStatus !== 'pendente') return false;
       if (filterStatus === 'atrasado' && currentMonthStatus !== 'atrasado') return false;
-
-      // 4. Filtrar pelo status de emissão da cobrança
-      if (filterIssued !== 'todos') {
-        const isIssued = isBillingIssuedForMonth(c, selectedYearMonth);
-        if (filterIssued === 'emitida' && !isIssued) return false;
-        if (filterIssued === 'nao_emitida' && isIssued) return false;
-      }
 
       return true;
     });
@@ -882,27 +879,15 @@ export default function App() {
     if (sortBy === 'nome') {
       return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
     }
-    if (sortBy === 'recebimento') {
-      return [...filtered].sort((a, b) => {
-        const getPaymentDateForSort = (client: Client, yearMonth: string) => {
-          const p = client.paymentHistory.find(item => item.yearMonth === yearMonth);
-          return p ? p.paymentDate : null;
-        };
-        const dateA = getPaymentDateForSort(a, selectedYearMonth);
-        const dateB = getPaymentDateForSort(b, selectedYearMonth);
-        if (dateA && dateB) {
-          return dateB.localeCompare(dateA); // Mais recente primeiro
-        }
-        if (dateA && !dateB) return -1; // Pagos vão para o topo
-        if (!dateA && dateB) return 1;
-        
-        // Se nenhum pagou, ordena alfabeticamente
-        return a.name.localeCompare(b.name);
-      });
-    }
-
-    return filtered;
-  }, [clients, searchQuery, filterType, filterStatus, filterIssued, selectedYearMonth, sortBy]);
+    
+    // Padrão / Vencimento: Ordena por dia do vencimento crescente
+    return [...filtered].sort((a, b) => {
+      if (a.dueDateDay !== b.dueDateDay) {
+        return a.dueDateDay - b.dueDateDay;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [clients, filterDueDate, filterStatus, selectedYearMonth, sortBy]);
 
   // --- Módulos auxiliares de controle de despesas ---
   const filteredExpenses = useMemo(() => {
@@ -970,7 +955,7 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen w-full font-sans flex flex-col antialiased relative overflow-hidden transition-colors duration-300 theme-bg ${
+    <div className={`min-h-screen w-full font-sans flex flex-col antialiased relative overflow-x-hidden transition-colors duration-300 theme-bg ${
       theme === 'dark' ? 'dark' : 'light'
     }`}>
       
@@ -1116,62 +1101,57 @@ export default function App() {
           <>
             {/* Filtros e Busca de Clientes */}
             <div id="filters-container" className="theme-card rounded-xl p-3.5 relative z-10 transition-all duration-300">
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
+                {/* Título e Contagem de Clientes */}
+                <div>
+                  <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold theme-title">Clientes Cadastrados</h3>
-                    <p className="text-[11px] theme-text-secondary mt-0.5">Gerencie o status de pagamento individual e configure cobranças</p>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
+                      {filteredClients.length} de {clients.length}
+                    </span>
                   </div>
-
-                  <div className="flex items-center gap-2 max-w-md w-full">
-                    {/* Input de Busca */}
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-secondary">
-                        <Search className="w-3.5 h-3.5" />
-                      </span>
-                      <input
-                        id="search-clients-input"
-                        type="text"
-                        placeholder="Pesquisar por nome do cliente ou notas..."
-                        className="w-full pl-8 pr-3 py-1.5 theme-input rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  <p className="text-[11px] theme-text-secondary mt-0.5">Gerencie os status e pagamentos com visualização simplificada</p>
                 </div>
 
-                {/* Abas de Filtragem Rápida */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t transition-colors duration-300" style={{ borderColor: 'var(--card-border)' }}>
+                {/* Controles de Filtragem Rápida: Vencimento + Status + Ordenação */}
+                <div className="flex flex-wrap items-center gap-2.5">
                   
-                  {/* Filtro do Tipo de Contrato */}
+                  {/* Filtro do Vencimento */}
                   <div className="flex items-center gap-1 min-w-max">
                     <span className="text-[11px] font-semibold theme-text-secondary flex items-center gap-1 mr-1">
-                      <Filter className="w-3 h-3 text-indigo-400" /> Cobrança:
+                      <CalendarDays className="w-3.5 h-3.5 text-indigo-400" /> Vencimento:
                     </span>
                     <div className="flex gap-0.5 border p-0.5 rounded-lg transition-all" style={{ backgroundColor: 'var(--pill-bg)', borderColor: 'var(--pill-border)' }}>
-                      {['todos', 'recorrente', 'mensal'].map((type) => (
-                        <button
-                          id={`filter-type-btn-${type}`}
-                          key={type}
-                          onClick={() => setFilterType(type as any)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-all cursor-pointer ${
-                            filterType === type 
-                               ? 'bg-indigo-500/15 theme-title border border-indigo-500/20 font-extrabold shadow-xs' 
-                               : 'theme-text-secondary hover:text-indigo-400 border border-transparent'
-                          }`}
-                        >
-                          {type === 'todos' ? 'Todos' : type === 'recorrente' ? 'Recorrentes' : 'Mensais'}
-                        </button>
-                      ))}
+                      {[
+                        { id: 'todos', label: 'Todos' },
+                        { id: '1-10', label: 'Dia 01 a 10' },
+                        { id: '11-20', label: 'Dia 11 a 20' },
+                        { id: '21-31', label: 'Dia 21 a 31' },
+                      ].map((item) => {
+                        const isActive = filterDueDate === item.id;
+                        return (
+                          <button
+                            id={`filter-duedate-btn-${item.id}`}
+                            key={item.id}
+                            onClick={() => setFilterDueDate(item.id)}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                              isActive 
+                                ? 'bg-indigo-500/15 theme-title border border-indigo-500/20 font-extrabold shadow-xs' 
+                                : 'theme-text-secondary hover:text-indigo-400 border border-transparent'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Filtro do Status de Pagamento */}
                   <div className="flex items-center gap-1 min-w-max">
                     <span className="text-[11px] font-semibold theme-text-secondary mr-1">Status:</span>
-                    <div className="flex gap-1 flex-wrap">
+                    <div className="flex gap-0.5 border p-0.5 rounded-lg transition-all" style={{ backgroundColor: 'var(--pill-bg)', borderColor: 'var(--pill-border)' }}>
                       {[
                         { id: 'todos', label: 'Todos' },
                         { id: 'pago', label: 'Pagos' },
@@ -1184,10 +1164,10 @@ export default function App() {
                             id={`filter-status-btn-${status.id}`}
                             key={status.id}
                             onClick={() => setFilterStatus(status.id as any)}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer border ${
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                               isActive 
-                                ? 'bg-indigo-500/15 theme-title border-indigo-500/25 font-bold' 
-                                : 'theme-btn-secondary hover:bg-opacity-80'
+                                ? 'bg-indigo-500/15 theme-title border border-indigo-500/25 font-bold' 
+                                : 'theme-text-secondary hover:text-indigo-400 border border-transparent'
                             }`}
                           >
                             {status.label}
@@ -1197,48 +1177,17 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Filtro de Emissão de Cobrança */}
-                  <div className="flex items-center gap-1 min-w-max">
-                    <span className="text-[11px] font-semibold theme-text-secondary flex items-center gap-1 mr-1">
-                      <FileCheck2 className="w-3 h-3 text-indigo-400" /> Emissão:
-                    </span>
-                    <div className="flex gap-0.5 border p-0.5 rounded-lg transition-all" style={{ backgroundColor: 'var(--pill-bg)', borderColor: 'var(--pill-border)' }}>
-                      {[
-                        { id: 'todos', label: 'Todas' },
-                        { id: 'emitida', label: 'Emitidas' },
-                        { id: 'nao_emitida', label: 'Não Emitidas' },
-                      ].map((item) => {
-                        const isActive = filterIssued === item.id;
-                        return (
-                          <button
-                            id={`filter-issued-btn-${item.id}`}
-                            key={item.id}
-                            onClick={() => setFilterIssued(item.id as any)}
-                            className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                              isActive 
-                                 ? 'bg-indigo-500/15 theme-title border border-indigo-500/20 font-extrabold shadow-xs' 
-                                 : 'theme-text-secondary hover:text-indigo-400 border border-transparent'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
                   {/* Ordenar por */}
                   <div className="flex items-center gap-1 min-w-max">
                     <span className="text-[11px] font-semibold theme-text-secondary flex items-center gap-1">
-                      <ArrowUpDown className="w-3 h-3 text-indigo-400" /> Ordenar:
+                      <ArrowUpDown className="w-3 h-3 text-indigo-400" />
                     </span>
                     <div className="flex gap-0.5 border p-0.5 rounded-lg transition-all" style={{ backgroundColor: 'var(--pill-bg)', borderColor: 'var(--pill-border)' }}>
                       {[
-                        { id: 'padrao', label: 'Padrão' },
-                        { id: 'nome', label: 'Nome' },
-                        { id: 'recebimento', label: 'Recebimento' },
+                        { id: 'vencimento', label: 'Por Vencimento' },
+                        { id: 'nome', label: 'Por Nome' },
                       ].map((item) => {
-                        const isActive = sortBy === item.id;
+                        const isActive = sortBy === item.id || (sortBy === 'padrao' && item.id === 'vencimento');
                         return (
                           <button
                             id={`sort-btn-${item.id}`}
@@ -1257,19 +1206,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Ação em lote: Marcar/Desmarcar todas emitidas */}
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <button
-                      id="batch-mark-issued-btn"
-                      onClick={() => handleBatchSetBillingIssued(selectedYearMonth, true)}
-                      className="px-2.5 py-1 text-[11px] font-semibold theme-btn-secondary hover:text-indigo-400 rounded-lg border transition-all flex items-center gap-1 cursor-pointer"
-                      title={`Marcar todas as cobranças ativas de ${formatYearMonth(selectedYearMonth)} como emitidas`}
-                    >
-                      <CheckCheck className="w-3 h-3 text-indigo-400" />
-                      <span>Marcar Todas Emitidas</span>
-                    </button>
-                  </div>
-
                 </div>
 
               </div>
@@ -1283,21 +1219,19 @@ export default function App() {
                 </div>
                 <h3 className="text-base font-bold theme-title">Nenhum cliente encontrado</h3>
                 <p className="text-xs theme-text-secondary max-w-sm mt-1">
-                  Tente reajustar seus filtros, limpar os campos de busca ou adicione novos clientes usando o botão de cadastro acima.
+                  Não há clientes correspondentes ao filtro de vencimento ou status selecionado.
                 </p>
-                {(searchQuery || filterType !== 'todos' || filterStatus !== 'todos' || filterIssued !== 'todos' || sortBy !== 'padrao') && (
+                {(filterDueDate !== 'todos' || filterStatus !== 'todos') && (
                   <button
                     id="reset-filters-btn"
                     onClick={() => {
-                      setSearchQuery('');
-                      setFilterType('todos');
+                      setFilterDueDate('todos');
                       setFilterStatus('todos');
-                      setFilterIssued('todos');
-                      setSortBy('padrao');
+                      setSortBy('vencimento');
                     }}
                     className="mt-3 px-3 py-1.5 theme-btn-secondary text-xs font-bold rounded-lg cursor-pointer transition-all"
                   >
-                    Limpar Filtros e Busca
+                    Limpar Filtros
                   </button>
                 )}
               </div>
@@ -1333,7 +1267,7 @@ export default function App() {
                   />
                 ))}
                 {/* Espaçador de segurança para que o último card nunca seja cortado ou tapado */}
-                <div className="h-16 lg:h-6 w-full shrink-0" aria-hidden="true" />
+                <div className="h-20 lg:h-8 w-full shrink-0" aria-hidden="true" />
               </div>
             )}
             </>
