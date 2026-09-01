@@ -47,7 +47,7 @@ import {
   formatYearMonth,
   isBillingIssuedForMonth
 } from './utils/clientHelpers';
-import { downloadBackupFile, syncDataToCloud, scheduleAutoSync, fetchCloudData } from './utils/cloudSync';
+import { downloadBackupFile, syncDataToCloud, scheduleAutoSync, fetchCloudData, subscribeToSyncBroadcast } from './utils/cloudSync';
 import MonthBar from './components/MonthBar';
 import StatsSection from './components/StatsSection';
 import ClientFormModal from './components/ClientFormModal';
@@ -267,34 +267,51 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
 
-  // Sincronização e Busca Automática da Nuvem Vercel na Abertura (PC e Celular)
+  // Sincronização e Busca Automática da Nuvem / JSON na Abertura (PC e Celular)
   useEffect(() => {
-    async function initCloudSync() {
+    async function loadLatestSystemData(silent = false) {
       try {
-        setIsCloudSyncing(true);
+        if (!silent) setIsCloudSyncing(true);
         const cloudResult = await fetchCloudData();
         if (cloudResult.success && cloudResult.data && cloudResult.data.clients && cloudResult.data.clients.length > 0) {
-          const localSaved = localStorage.getItem('contr_clientes_data');
-          // Se não houver dados locais, ou se o cloud tiver dados reais, atualiza
-          if (!localSaved || JSON.parse(localSaved).length === 0 || cloudResult.data.clients.length > 0) {
-            setClients(cloudResult.data.clients);
-            if (cloudResult.data.expenses && Array.isArray(cloudResult.data.expenses)) {
-              setExpenses(cloudResult.data.expenses);
-            }
-            if (cloudResult.data.expenseCategories && Array.isArray(cloudResult.data.expenseCategories)) {
-              setExpCategories(cloudResult.data.expenseCategories);
-            }
-            showToast(`✓ Base sincronizada com sucesso (${cloudResult.data.clients.length} clientes carregados da nuvem)`, 'success');
+          setClients(cloudResult.data.clients);
+          if (cloudResult.data.expenses && Array.isArray(cloudResult.data.expenses)) {
+            setExpenses(cloudResult.data.expenses);
+          }
+          if (cloudResult.data.expenseCategories && Array.isArray(cloudResult.data.expenseCategories)) {
+            setExpCategories(cloudResult.data.expenseCategories);
+          }
+          if (!silent) {
+            showToast(`✓ Base JSON carregada (${cloudResult.data.clients.length} clientes sincronizados)`, 'success');
           }
         }
       } catch (e) {
         console.warn('Sincronização de nuvem em segundo plano:', e);
       } finally {
-        setIsCloudSyncing(false);
+        if (!silent) setIsCloudSyncing(false);
       }
     }
 
-    initCloudSync();
+    loadLatestSystemData(false);
+
+    // Atualiza automaticamente quando a tela ganha foco (ao voltar do celular para PC ou vice-versa)
+    const handleFocus = () => {
+      loadLatestSystemData(true);
+    };
+
+    // Escuta sincronizações disparadas por outras abas / instâncias
+    const unsubscribeBroadcast = subscribeToSyncBroadcast(() => {
+      loadLatestSystemData(true);
+    });
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+      unsubscribeBroadcast();
+    };
   }, []);
 
   // Sincronização Manual sob Demanda (1 Clique para enviar do PC ao Celular)
@@ -303,28 +320,34 @@ export default function App() {
     try {
       const res = await syncDataToCloud(clients, expenses, expCategories, dbConfig, currentUser.name, currentUser.email);
       if (res.success) {
-        showToast('✓ Dados da sua máquina sincronizados no JSON da Vercel e prontos no Celular!', 'success');
+        showToast('✓ Dados gravados no JSON do sistema e sincronizados com sucesso!', 'success');
       } else {
         showToast('Aviso: ' + res.message, 'info');
       }
     } catch (e: any) {
-      showToast('Erro ao sincronizar com nuvem: ' + e?.message, 'error');
+      showToast('Erro ao sincronizar com JSON: ' + e?.message, 'error');
     } finally {
       setIsCloudSyncing(false);
     }
   };
 
-  // Persistir clientes no localStorage e agendar sincronização automática com a Vercel
+  // Persistir clientes no localStorage e gravar automaticamente no JSON do sistema
   useEffect(() => {
     localStorage.setItem('contr_clientes_data', JSON.stringify(clients));
     scheduleAutoSync(clients, expenses, expCategories, dbConfig);
   }, [clients]);
 
-  // Persistir despesas no localStorage e agendar sincronização automática com a Vercel
+  // Persistir despesas no localStorage e gravar automaticamente no JSON do sistema
   useEffect(() => {
     localStorage.setItem('contr_clientes_expenses', JSON.stringify(expenses));
     scheduleAutoSync(clients, expenses, expCategories, dbConfig);
   }, [expenses]);
+
+  // Persistir categorias de despesas e gravar automaticamente no JSON do sistema
+  useEffect(() => {
+    localStorage.setItem('contr_clientes_expense_categories', JSON.stringify(expCategories));
+    scheduleAutoSync(clients, expenses, expCategories, dbConfig);
+  }, [expCategories]);
 
   // Verificação de Inicialização do Banco de Dados (.JSON) na Abertura do Sistema
   useEffect(() => {
@@ -1020,7 +1043,7 @@ export default function App() {
       )}
 
       {/* Painel Central com Layout Responsivo de 2 Colunas (Menu Lateral + Área de Conteúdo) */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-3 lg:gap-4 relative z-10 overflow-hidden pb-14 sm:pb-16 lg:pb-5">
+      <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-3 lg:gap-4 relative z-10 pb-20 sm:pb-24 lg:pb-6">
         
         {/* Coluna Esquerda: Menu Lateral de Ações e Auditoria */}
         <SidebarNav 
@@ -1043,7 +1066,7 @@ export default function App() {
         />
 
         {/* Coluna Direita: Área de Conteúdo das Abas */}
-        <main className="flex-1 flex flex-col space-y-3.5 overflow-y-auto scrollbar-thin pr-1 pb-4">
+        <main className="flex-1 flex flex-col space-y-3.5 pb-24 sm:pb-28 lg:pb-8">
           
           {activeTab === 'sync' ? (
             <VercelSyncView 
@@ -1279,7 +1302,7 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <div id="client-cards-container" className="space-y-2 lg:space-y-2.5 relative z-10">
+              <div id="client-cards-container" className="space-y-2 lg:space-y-2.5 relative z-10 pb-6">
                 {filteredClients.map((client) => (
                   <ClientCard
                     key={client.id}
@@ -1309,6 +1332,8 @@ export default function App() {
                     formatYearMonth={formatYearMonth}
                   />
                 ))}
+                {/* Espaçador de segurança para que o último card nunca seja cortado ou tapado */}
+                <div className="h-16 lg:h-6 w-full shrink-0" aria-hidden="true" />
               </div>
             )}
             </>
@@ -1833,6 +1858,9 @@ export default function App() {
 
                 </div>
               </div>
+
+              {/* Espaçador de segurança para que o final da lista de despesas nunca seja cortado */}
+              <div className="h-16 lg:h-6 w-full shrink-0" aria-hidden="true" />
 
             </div>
           </div>

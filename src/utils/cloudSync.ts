@@ -273,7 +273,36 @@ export async function fetchCloudData(): Promise<{
   };
 }
 
-// Controle de Auto-Sync com Debounce
+// Canal de Broadcast para sincronização imediata entre múltiplas abas / telas
+let syncBroadcastChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    syncBroadcastChannel = new BroadcastChannel('gestor_financeiro_sync_channel');
+  }
+} catch {
+  // fallback se não suportado
+}
+
+export function broadcastLocalChange(type: 'clients' | 'expenses' | 'all') {
+  try {
+    syncBroadcastChannel?.postMessage({ type, timestamp: Date.now() });
+  } catch {}
+}
+
+export function subscribeToSyncBroadcast(onSyncTriggered: (type: string) => void) {
+  if (!syncBroadcastChannel) return () => {};
+  const handler = (event: MessageEvent) => {
+    if (event.data && event.data.type) {
+      onSyncTriggered(event.data.type);
+    }
+  };
+  syncBroadcastChannel.addEventListener('message', handler);
+  return () => {
+    syncBroadcastChannel?.removeEventListener('message', handler);
+  };
+}
+
+// Controle de Auto-Sync com Debounce rápido (300ms para persistência imediata)
 let autoSyncTimeout: any = null;
 
 export function scheduleAutoSync(
@@ -290,6 +319,9 @@ export function scheduleAutoSync(
     clearTimeout(autoSyncTimeout);
   }
 
+  // Notifica outras abas locais
+  broadcastLocalChange('all');
+
   autoSyncTimeout = setTimeout(async () => {
     try {
       const res = await syncDataToCloud(clients, expenses, categories, dbConfig);
@@ -299,5 +331,5 @@ export function scheduleAutoSync(
     } catch (e) {
       console.warn('AutoSync falhou silenciosamente:', e);
     }
-  }, 1200); // 1.2s de debounce para evitar requisições repetitivas ao digitar
+  }, 300); // 300ms de debounce para gravação quase instantânea no JSON
 }
