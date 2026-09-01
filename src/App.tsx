@@ -848,22 +848,66 @@ export default function App() {
     };
   }, [clients, selectedYearMonth]);
 
+  // --- Resumo dos Vencimentos Encontrados no Mês Selecionado ---
+  const dueDateSummary = useMemo(() => {
+    const map = new Map<number, {
+      day: number;
+      count: number;
+      totalValue: number;
+      paidCount: number;
+      pendingCount: number;
+      lateCount: number;
+      formattedDueDate: string;
+    }>();
+
+    let totalMonthCount = 0;
+    let totalMonthValue = 0;
+
+    clients.forEach(client => {
+      const status = getClientStatusForMonth(client, selectedYearMonth, TODAY_STR);
+      if (status === 'sem_cobranca') return;
+
+      totalMonthCount++;
+      totalMonthValue += client.value;
+
+      const day = client.dueDateDay;
+      const rawDueDate = getDueDateForMonth(day, selectedYearMonth);
+      const formattedDueDate = formatDate(rawDueDate);
+
+      const existing = map.get(day) || {
+        day,
+        count: 0,
+        totalValue: 0,
+        paidCount: 0,
+        pendingCount: 0,
+        lateCount: 0,
+        formattedDueDate,
+      };
+
+      existing.count += 1;
+      existing.totalValue += client.value;
+      if (status === 'pago') existing.paidCount += 1;
+      else if (status === 'pendente') existing.pendingCount += 1;
+      else if (status === 'atrasado') existing.lateCount += 1;
+
+      map.set(day, existing);
+    });
+
+    const days = Array.from(map.values()).sort((a, b) => a.day - b.day);
+
+    return {
+      totalMonthCount,
+      totalMonthValue,
+      days,
+    };
+  }, [clients, selectedYearMonth]);
 
   // --- Filtragem dos Clientes para Exibição ---
   const filteredClients = useMemo(() => {
     const filtered = clients.filter(c => {
-      // 1. Filtrar pelo vencimento (dia)
+      // 1. Filtrar pelo vencimento específico selecionado
       if (filterDueDate !== 'todos') {
-        if (filterDueDate === '1-10') {
-          if (c.dueDateDay < 1 || c.dueDateDay > 10) return false;
-        } else if (filterDueDate === '11-20') {
-          if (c.dueDateDay < 11 || c.dueDateDay > 20) return false;
-        } else if (filterDueDate === '21-31') {
-          if (c.dueDateDay < 21 || c.dueDateDay > 31) return false;
-        } else {
-          // Dia específico (ex: "5", "10", "15")
-          if (c.dueDateDay !== Number(filterDueDate)) return false;
-        }
+        if (c.dueDateDay !== Number(filterDueDate)) return false;
       }
 
       // 2. Filtrar pelo status de pagamento do mês selecionado
@@ -1074,6 +1118,7 @@ export default function App() {
               clients={clients}
               expenses={expenses}
               currentYear={dashboardYear}
+              initialYearMonth={selectedYearMonth}
               onYearChange={(newYear) => setDashboardYear(newYear)}
               theme={theme}
             />
@@ -1099,56 +1144,29 @@ export default function App() {
             {/* Abas de Exibição Condicionais */}
             {activeTab === 'clientes' ? (
           <>
-            {/* Filtros e Busca de Clientes */}
-            <div id="filters-container" className="theme-card rounded-xl p-3.5 relative z-10 transition-all duration-300">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                
-                {/* Título e Contagem de Clientes */}
+            {/* Filtros e Resumo de Vencimentos do Mês */}
+            <div id="filters-container" className="theme-card rounded-xl p-3.5 relative z-10 transition-all duration-300 space-y-3">
+              
+              {/* Linha Superior: Título, Filtro de Status e Ordenação */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-2.5 border-b transition-colors duration-300" style={{ borderColor: 'var(--card-border)' }}>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold theme-title">Clientes Cadastrados</h3>
+                    <h3 className="text-xs font-bold theme-title flex items-center gap-1.5">
+                      <CalendarDays className="w-3.5 h-3.5 text-indigo-400" />
+                      Vencimentos em {formatYearMonth(selectedYearMonth)}
+                    </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
                       {filteredClients.length} de {clients.length}
                     </span>
                   </div>
-                  <p className="text-[11px] theme-text-secondary mt-0.5">Gerencie os status e pagamentos com visualização simplificada</p>
+                  <p className="text-[11px] theme-text-secondary mt-0.5">
+                    Resumo e filtro por vencimentos encontrados neste mês
+                  </p>
                 </div>
 
-                {/* Controles de Filtragem Rápida: Vencimento + Status + Ordenação */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  
-                  {/* Filtro do Vencimento */}
-                  <div className="flex items-center gap-1 min-w-max">
-                    <span className="text-[11px] font-semibold theme-text-secondary flex items-center gap-1 mr-1">
-                      <CalendarDays className="w-3.5 h-3.5 text-indigo-400" /> Vencimento:
-                    </span>
-                    <div className="flex gap-0.5 border p-0.5 rounded-lg transition-all" style={{ backgroundColor: 'var(--pill-bg)', borderColor: 'var(--pill-border)' }}>
-                      {[
-                        { id: 'todos', label: 'Todos' },
-                        { id: '1-10', label: 'Dia 01 a 10' },
-                        { id: '11-20', label: 'Dia 11 a 20' },
-                        { id: '21-31', label: 'Dia 21 a 31' },
-                      ].map((item) => {
-                        const isActive = filterDueDate === item.id;
-                        return (
-                          <button
-                            id={`filter-duedate-btn-${item.id}`}
-                            key={item.id}
-                            onClick={() => setFilterDueDate(item.id)}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                              isActive 
-                                ? 'bg-indigo-500/15 theme-title border border-indigo-500/20 font-extrabold shadow-xs' 
-                                : 'theme-text-secondary hover:text-indigo-400 border border-transparent'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Filtro do Status de Pagamento */}
+                {/* Controles de Status e Ordenação */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Status */}
                   <div className="flex items-center gap-1 min-w-max">
                     <span className="text-[11px] font-semibold theme-text-secondary mr-1">Status:</span>
                     <div className="flex gap-0.5 border p-0.5 rounded-lg transition-all" style={{ backgroundColor: 'var(--pill-bg)', borderColor: 'var(--pill-border)' }}>
@@ -1177,7 +1195,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Ordenar por */}
+                  {/* Ordenação */}
                   <div className="flex items-center gap-1 min-w-max">
                     <span className="text-[11px] font-semibold theme-text-secondary flex items-center gap-1">
                       <ArrowUpDown className="w-3 h-3 text-indigo-400" />
@@ -1205,10 +1223,63 @@ export default function App() {
                       })}
                     </div>
                   </div>
-
                 </div>
-
               </div>
+
+              {/* Linha Inferior: Filtro Direto por Dias de Vencimento do Mês */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                <span className="text-[11px] font-bold theme-text-secondary flex items-center gap-1 mr-1 select-none">
+                  <CalendarDays className="w-3.5 h-3.5 text-indigo-400" />
+                  Vencimento:
+                </span>
+
+                <button
+                  id="filter-duedate-all"
+                  type="button"
+                  onClick={() => setFilterDueDate('todos')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                    filterDueDate === 'todos'
+                      ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 shadow-xs ring-1 ring-indigo-500/20'
+                      : 'theme-btn-secondary text-slate-400 hover:text-indigo-400 border-transparent hover:border-slate-300 dark:hover:border-white/10'
+                  }`}
+                >
+                  Todos ({dueDateSummary.days.reduce((acc, d) => acc + d.count, 0)})
+                </button>
+
+                {dueDateSummary.days.length === 0 ? (
+                  <span className="text-xs theme-text-secondary italic py-1 px-2">
+                    Nenhum vencimento neste mês.
+                  </span>
+                ) : (
+                  dueDateSummary.days.map((item) => {
+                    const isSelected = filterDueDate === String(item.day);
+                    return (
+                      <button
+                        id={`filter-duedate-btn-${item.day}`}
+                        key={item.day}
+                        type="button"
+                        onClick={() => setFilterDueDate(isSelected ? 'todos' : String(item.day))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/40 shadow-xs ring-1 ring-indigo-500/30'
+                            : 'theme-btn-secondary text-slate-400 hover:text-indigo-400 border-transparent hover:border-slate-300 dark:hover:border-white/10'
+                        }`}
+                        title={`Filtrar clientes com vencimento no Dia ${String(item.day).padStart(2, '0')}`}
+                      >
+                        <span>Dia {String(item.day).padStart(2, '0')}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                          isSelected 
+                            ? 'bg-indigo-500/25 text-indigo-300' 
+                            : 'bg-slate-500/10 text-slate-400'
+                        }`}>
+                          {item.count}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
             </div>
 
             {/* Listagem de Clientes */}

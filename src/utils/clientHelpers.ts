@@ -43,6 +43,16 @@ export function formatYearMonth(yearMonth: string): string {
 }
 
 /**
+ * Retorna o ano-mês atual do sistema no formato "YYYY-MM"
+ */
+export function getRealCurrentYearMonth(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+/**
  * Retorna a data de vencimento real para um cliente em um determinado ano e mês.
  * Trata casos como dia 31 em meses que possuem menos dias.
  */

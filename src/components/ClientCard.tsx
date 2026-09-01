@@ -39,15 +39,18 @@ export const ClientCard: React.FC<ClientCardProps> = ({
   onSelectDetail,
   onOpenPayment,
   onUndoPayment,
+  onToggleIssued,
   onEditClient,
   onDeleteClient,
   getClientStatusForMonth,
+  isBillingIssuedForMonth,
   getDueDateForMonth,
   formatCurrency,
   formatDate,
 }) => {
   const currentStatus = getClientStatusForMonth(client, selectedYearMonth, todayStr);
   const customMonthPayment = client.paymentHistory.find(p => p.yearMonth === selectedYearMonth);
+  const isIssued = isBillingIssuedForMonth ? isBillingIssuedForMonth(client, selectedYearMonth) : false;
   
   const calculatedDueStr = getDueDateForMonth(client.dueDateDay, selectedYearMonth);
   const formattedRealDueDate = formatDate(calculatedDueStr);
@@ -58,7 +61,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
       <div 
         id={`mobile-client-card-${client.id}`}
         onClick={() => onSelectDetail(client)}
-        className={`lg:hidden theme-card rounded-xl p-3 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-between gap-2.5 shadow-xs border ${
+        className={`lg:hidden theme-card rounded-xl p-2.5 sm:p-3 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-between gap-2 shadow-xs border ${
           client.status === 'inativo' ? 'opacity-40' : ''
         } ${
           currentStatus === 'pago' 
@@ -85,36 +88,62 @@ export const ClientCard: React.FC<ClientCardProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-[10px] theme-text-secondary">
-            <span>Venc: <strong className="theme-text-primary font-semibold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong> ({formattedRealDueDate})</span>
+          <div className="flex flex-wrap items-center gap-1.5 text-[9.5px] theme-text-secondary">
+            <span>Venc: <strong className="theme-text-primary font-semibold">Dia {String(client.dueDateDay).padStart(2, '0')}</strong></span>
+            <span className="theme-text-muted">•</span>
+            <span>{formattedRealDueDate}</span>
           </div>
         </div>
 
-        {/* Lado Direito: Valor + Status + Ação Rápida */}
+        {/* Lado Direito: Check Cobrança + Valor + Status + Ação Rápida */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="text-right">
-            <span className="text-xs sm:text-sm font-black theme-title block leading-tight">
+          
+          {/* Botão de Cobrança Emitida no Mobile */}
+          {currentStatus !== 'sem_cobranca' && onToggleIssued && (
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <button
+                type="button"
+                id={`mobile-issued-btn-${client.id}`}
+                onClick={() => onToggleIssued(client.id, selectedYearMonth)}
+                className={`p-1.5 rounded-lg text-[9px] font-bold border transition-all flex items-center gap-1 active:scale-90 cursor-pointer ${
+                  isIssued
+                    ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
+                    : 'text-slate-400 border-slate-300/60 dark:border-white/10 hover:border-indigo-400'
+                }`}
+                title={isIssued ? "Cobrança emitida (toque para desmarcar)" : "Toque para marcar cobrança como emitida"}
+              >
+                {isIssued ? (
+                  <CheckSquare className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                ) : (
+                  <Square className="w-3.5 h-3.5 shrink-0" />
+                )}
+              </button>
+            </div>
+          )}
+
+          <div className="text-right shrink-0">
+            <span className="text-xs sm:text-sm font-black theme-title block leading-tight whitespace-nowrap">
               {formatCurrency(client.value)}
             </span>
             {currentStatus === 'pago' ? (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-500">
-                <CheckCircle2 className="w-2.5 h-2.5" /> Pago
+              <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-emerald-500 whitespace-nowrap">
+                <CheckCircle2 className="w-2.5 h-2.5 shrink-0" /> Pago
               </span>
             ) : currentStatus === 'atrasado' ? (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-rose-500">
-                <AlertCircle className="w-2.5 h-2.5" /> Atrasado
+              <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-rose-500 whitespace-nowrap">
+                <AlertCircle className="w-2.5 h-2.5 shrink-0" /> Atrasado
               </span>
             ) : currentStatus === 'pendente' ? (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-500">
-                <Clock className="w-2.5 h-2.5" /> Pendente
+              <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-amber-500 whitespace-nowrap">
+                <Clock className="w-2.5 h-2.5 shrink-0" /> Pendente
               </span>
             ) : (
-              <span className="text-[9px] text-slate-400">Sem fat.</span>
+              <span className="text-[8.5px] text-slate-400 whitespace-nowrap">Sem fat.</span>
             )}
           </div>
 
           {/* Botão de Ação / Toque */}
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
             {currentStatus === 'pago' ? (
               <button
                 type="button"
@@ -213,27 +242,49 @@ export const ClientCard: React.FC<ClientCardProps> = ({
 
         {/* Informações Financeiras & Valor */}
         <div 
-          className="flex flex-col sm:flex-row lg:items-center gap-4 sm:gap-6 lg:ml-3 border-t lg:border-t-0 pt-2 lg:pt-0 shrink-0 select-none transition-colors duration-300"
+          className="flex flex-col sm:flex-row lg:items-center gap-3 sm:gap-4 lg:ml-3 border-t lg:border-t-0 pt-2 lg:pt-0 shrink-0 select-none transition-colors duration-300"
           style={{ borderColor: 'var(--card-border)' }}
         >
           
+          {/* Cobrança Emitida Checkbox (Desktop) */}
+          {currentStatus !== 'sem_cobranca' && onToggleIssued && (
+            <button
+              type="button"
+              id={`issued-btn-${client.id}`}
+              onClick={() => onToggleIssued(client.id, selectedYearMonth)}
+              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                isIssued
+                  ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/20'
+                  : 'theme-btn-secondary text-slate-400 hover:text-indigo-400'
+              }`}
+              title={isIssued ? "Cobrança marcada como emitida (clique para desmarcar)" : "Clique para marcar cobrança como emitida"}
+            >
+              {isIssued ? (
+                <CheckSquare className="w-3.5 h-3.5 text-indigo-400" />
+              ) : (
+                <Square className="w-3.5 h-3.5" />
+              )}
+              <span>{isIssued ? 'Emitida' : 'Emitir'}</span>
+            </button>
+          )}
+
           {/* Valor cobrado */}
-          <div className="min-w-[105px]">
+          <div className="min-w-[95px]">
             <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block">Valor Mensal</span>
             <span className="text-base font-black theme-title">{formatCurrency(client.value)}</span>
           </div>
 
           {/* status específico do mês selecionado */}
-          <div className="min-w-[130px]">
+          <div className="min-w-[115px]">
             <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block mb-1">Status Pagamento</span>
             
             {currentStatus === 'pago' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 w-max">
-                  <CheckCircle2 className="w-3 h-3" /> Pago
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 w-max whitespace-nowrap">
+                  <CheckCircle2 className="w-2.5 h-2.5" /> Pago
                 </span>
                 {customMonthPayment && (
-                  <span className="text-[9px] theme-text-secondary mt-0.5 font-medium">
+                  <span className="text-[9px] theme-text-secondary mt-0.5 font-medium whitespace-nowrap">
                     {formatDate(customMonthPayment.paymentDate)}
                     {customMonthPayment.amount !== client.value && ` (${formatCurrency(customMonthPayment.amount)})`}
                   </span>
@@ -241,30 +292,30 @@ export const ClientCard: React.FC<ClientCardProps> = ({
               </div>
             ) : currentStatus === 'atrasado' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-rose-600 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 w-max">
-                  <AlertCircle className="w-3 h-3" /> Atrasado
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold text-rose-600 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/25 w-max whitespace-nowrap">
+                  <AlertCircle className="w-2.5 h-2.5" /> Atrasado
                 </span>
-                <span className="text-[9px] text-rose-600 dark:text-rose-450 font-semibold mt-0.5">
+                <span className="text-[9px] text-rose-600 dark:text-rose-450 font-semibold mt-0.5 whitespace-nowrap">
                   Venceu: {formattedRealDueDate}
                 </span>
               </div>
             ) : currentStatus === 'pendente' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 w-max">
-                  <Clock className="w-3 h-3" /> Pendente
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 w-max whitespace-nowrap">
+                  <Clock className="w-2.5 h-2.5" /> Pendente
                 </span>
-                <span className="text-[9px] theme-text-secondary mt-0.5 font-medium">
+                <span className="text-[9px] theme-text-secondary mt-0.5 font-medium whitespace-nowrap">
                   Vence: {formattedRealDueDate}
                 </span>
               </div>
             ) : currentStatus === 'sem_cobranca' ? (
               <div className="flex flex-col">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/15 w-max">
-                  <Clock className="w-3 h-3 text-slate-400" /> Sem faturamento
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold text-slate-400 bg-slate-500/10 border border-slate-500/15 w-max whitespace-nowrap">
+                  <Clock className="w-2.5 h-2.5 text-slate-400" /> Sem faturamento
                 </span>
               </div>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-text-secondary bg-slate-500/10 border border-slate-400/20 w-max">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold theme-text-secondary bg-slate-500/10 border border-slate-400/20 w-max whitespace-nowrap">
                 Sem cobrança
               </span>
             )}
@@ -327,3 +378,4 @@ export const ClientCard: React.FC<ClientCardProps> = ({
     </>
   );
 };
+
