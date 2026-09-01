@@ -1,0 +1,6 @@
+{
+  "name": "Controle de Clientes",
+  "description": "Sistema simples e para controle de pagamentos mensais de clientes, vencimentos, tipos de contrato (recorrente ou mensal) e histórico de quitação por mês.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

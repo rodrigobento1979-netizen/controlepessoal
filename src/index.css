@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  /* Tema Claro Equilibrado (Soft Slate / Confortável aos olhos, sem ofuscamento branco excessivo) */
+  --bg-color: #eaf0f6; /* Fundo suave relaxante que não cansa a visão */
+  --text-color: #0f172a; /* Texto principal de alto contraste */
+  --card-bg: #ffffff; /* Superfície branca limpa sobre fundo neutro */
+  --card-border: #cbd5e1; /* Borda nítida de separação */
+  --card-shadow: 0 2px 4px -1px rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --text-title: #0f172a;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --header-bg: #ffffff;
+  --header-border: #d5dde7;
+  --input-bg: #f8fafc;
+  --input-border: #94a3b8;
+  --input-focus-bg: #ffffff;
+  --pill-bg: #e2e8f0;
+  --pill-border: #cbd5e1;
+  
+  --tab-active-bg: #e0e7ff;
+  --tab-active-text: #4338ca;
+  --tab-active-border: #c7d2fe;
+  --badge-inactive-bg: #e2e8f0;
+  --badge-inactive-text: #475569;
+  --badge-inactive-border: #cbd5e1;
+  
+  --modal-backdrop: rgba(15, 23, 42, 0.6);
+  --modal-bg: #ffffff;
+  --modal-border: #cbd5e1;
+  --modal-header-bg: #f8fafc;
+  --modal-desc-color: #475569;
+  --modal-text: #0f172a;
+  
+  --button-hover-bg: #e2e8f0;
+  
+  --baixa-bg: #f8fafc;
+  --baixa-border: #cbd5e1;
+  --footer-bg: #e2e8f0;
+  --footer-border: #cbd5e1;
+}
+
+.dark {
+  /* Tema Escuro Equilibrado (Deep Slate Suave, sem pretos excessivos nem fadiga visual) */
+  --bg-color: #141b27; /* Fundo escuro azul-ardósia balanceado (não é preto puro) */
+  --text-color: #f1f5f9;
+  --card-bg: #1e2838; /* Card com elevação e profundidade perceptível */
+  --card-border: #2e3d54; /* Borda bem calibrada */
+  --card-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+  --text-title: #ffffff;
+  --text-primary: #f1f5f9;
+  --text-secondary: #9cb1cb; /* Cinza-azulado com excelente legibilidade */
+  --text-muted: #6b829e;
+  --header-bg: #182232;
+  --header-border: #2b394f;
+  --input-bg: #131a26;
+  --input-border: #354763;
+  --input-focus-bg: #1a2332;
+  --pill-bg: #16202e;
+  --pill-border: #2e3d54;
+  
+  --tab-active-bg: rgba(99, 102, 241, 0.25);
+  --tab-active-text: #c7d2fe;
+  --tab-active-border: rgba(99, 102, 241, 0.5);
+  --badge-inactive-bg: #16202e;
+  --badge-inactive-text: #9cb1cb;
+  --badge-inactive-border: #2e3d54;
+  
+  --modal-backdrop: rgba(7, 11, 19, 0.8);
+  --modal-bg: #1e2838;
+  --modal-border: #2e3d54;
+  --modal-header-bg: #16202e;
+  --modal-desc-color: #9cb1cb;
+  --modal-text: #ffffff;
+  
+  --button-hover-bg: #28374d;
+  
+  --baixa-bg: #16202e;
+  --baixa-border: #2e3d54;
+  --footer-bg: #182232;
+  --footer-border: #2b394f;
+}
+
+.theme-bg {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.theme-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  color: var(--text-color);
+}
+
+.theme-header {
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+}
+
+.theme-footer {
+  background-color: var(--footer-bg);
+  border-top: 1px solid var(--footer-border);
+}
+
+.theme-title {
+  color: var(--text-title);
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+}
+
+.theme-input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-title);
+}
+
+.theme-input:focus {
+  background-color: var(--input-focus-bg);
+}
+
+/* Modais */
+.theme-modal-backdrop {
+  background-color: var(--modal-backdrop);
+}
+
+.theme-modal {
+  background-color: var(--modal-bg);
+  border: 1px solid var(--modal-border);
+  color: var(--modal-text);
+}
+
+.theme-modal-header {
+  border-bottom: 1px solid var(--modal-border);
+  background-color: var(--modal-header-bg);
+}
+
+.theme-modal-footer {
+  border-top: 1px solid var(--modal-border);
+  background-color: var(--modal-header-bg);
+}
+
+.theme-btn-secondary {
+  background-color: var(--badge-inactive-bg);
+  border: 1px solid var(--badge-inactive-border);
+  color: var(--badge-inactive-text);
+}
+
+.theme-btn-secondary:hover {
+  background-color: var(--button-hover-bg);
+  color: var(--text-title);
+}
+
+/* Prevenir rolagem/scroll horizontal lateral e evitar múltiplos scrolls verticais na janela */
+html, body, #root {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100% !important;
+  max-height: 100vh !important;
+  overflow: hidden !important; /* Toda a janela é travada para evitar barra de scroll dupla */
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 300ms, color 300ms;
+}
+
+/* Customização premium do scrollbar para evitar barras cinzas/brancas e integrar com o tema */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--card-border);
+  border-radius: 9999px;
+  border: 2px solid var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
+
+/* Para navegadores Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border) var(--bg-color);
+}
