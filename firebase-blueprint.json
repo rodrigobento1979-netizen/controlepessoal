@@ -1,0 +1,26 @@
+{
+  "entities": {
+    "clients": {
+      "title": "Clientes",
+      "description": "Lista de clientes com contratos e histórico de pagamentos",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contract": { "type": "string" },
+        "value": { "type": "number" },
+        "status": { "type": "string" },
+        "dueDateDay": { "type": "number" }
+      }
+    },
+    "expenses": {
+      "title": "Despesas",
+      "description": "Despesas e custos operacionais",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "value": { "type": "number" },
+        "yearMonth": { "type": "string" }
+      }
+    }
+  }
+}

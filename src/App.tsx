@@ -48,6 +48,16 @@ import {
   isBillingIssuedForMonth
 } from './utils/clientHelpers';
 import { downloadBackupFile, syncDataToCloud, scheduleAutoSync, fetchCloudData, subscribeToSyncBroadcast } from './utils/cloudSync';
+import { 
+  subscribeToFirestore, 
+  saveClientToFirestore, 
+  deleteClientFromFirestore, 
+  saveExpenseToFirestore, 
+  deleteExpenseFromFirestore, 
+  saveCategoriesToFirestore,
+  syncAllToFirestore,
+  fetchAllFromFirestore
+} from './firebase/firestoreService';
 import MonthBar from './components/MonthBar';
 import StatsSection from './components/StatsSection';
 import ClientFormModal from './components/ClientFormModal';
@@ -265,50 +275,40 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
 
-  // Sincronização e Busca Automática da Nuvem / JSON na Abertura (PC e Celular)
+  // Sincronização em Tempo Real com o Banco de Dados Cloud Firestore (PC e Celular)
   useEffect(() => {
-    async function loadLatestSystemData(silent = false) {
-      try {
-        if (!silent) setIsCloudSyncing(true);
-        const cloudResult = await fetchCloudData();
-        if (cloudResult.success && cloudResult.data && cloudResult.data.clients && cloudResult.data.clients.length > 0) {
-          setClients(cloudResult.data.clients);
-          if (cloudResult.data.expenses && Array.isArray(cloudResult.data.expenses)) {
-            setExpenses(cloudResult.data.expenses);
-          }
-          if (cloudResult.data.expenseCategories && Array.isArray(cloudResult.data.expenseCategories)) {
-            setExpCategories(cloudResult.data.expenseCategories);
-          }
-          if (!silent) {
-            showToast(`✓ Base JSON carregada (${cloudResult.data.clients.length} clientes sincronizados)`, 'success');
-          }
+    let isInitialFetch = true;
+
+    const unsubscribeFirestore = subscribeToFirestore(
+      async (remoteClients) => {
+        if (remoteClients && remoteClients.length > 0) {
+          setClients(remoteClients);
+        } else if (isInitialFetch) {
+          // Se o Firestore estiver vazio pela primeira vez, faz o seed automático com os dados locais
+          const localClients = getInitialClients();
+          const localExpenses = getInitialExpenses();
+          const localCats = ['Infraestrutura', 'Marketing', 'Serviços', 'Salários', 'Impostos', 'Outros'];
+          await syncAllToFirestore(localClients, localExpenses, localCats);
         }
-      } catch (e) {
-        console.warn('Sincronização de nuvem em segundo plano:', e);
-      } finally {
-        if (!silent) setIsCloudSyncing(false);
+        isInitialFetch = false;
+      },
+      (remoteExpenses) => {
+        if (remoteExpenses && remoteExpenses.length > 0) {
+          setExpenses(remoteExpenses);
+        }
+      },
+      (remoteCategories) => {
+        if (remoteCategories && remoteCategories.length > 0) {
+          setExpCategories(remoteCategories);
+        }
+      },
+      (error) => {
+        console.warn('Conexão com Firestore:', error);
       }
-    }
-
-    loadLatestSystemData(false);
-
-    // Atualiza automaticamente quando a tela ganha foco (ao voltar do celular para PC ou vice-versa)
-    const handleFocus = () => {
-      loadLatestSystemData(true);
-    };
-
-    // Escuta sincronizações disparadas por outras abas / instâncias
-    const unsubscribeBroadcast = subscribeToSyncBroadcast(() => {
-      loadLatestSystemData(true);
-    });
-
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('visibilitychange', handleFocus);
+    );
 
     return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('visibilitychange', handleFocus);
-      unsubscribeBroadcast();
+      unsubscribeFirestore();
     };
   }, []);
 
@@ -316,38 +316,38 @@ export default function App() {
   const handleManualSync = async () => {
     setIsCloudSyncing(true);
     try {
-      const res = await syncDataToCloud(clients, expenses, expCategories, dbConfig, currentUser.name, currentUser.email);
+      const res = await syncAllToFirestore(clients, expenses, expCategories);
       if (res.success) {
-        showToast('✓ Dados gravados no JSON do sistema e sincronizados com a Vercel!', 'success');
+        showToast('✓ Dados gravados no Banco de Dados Firestore com sucesso!', 'success');
       } else {
         showToast('Aviso: ' + res.message, 'info');
       }
     } catch (e: any) {
-      showToast('Erro ao sincronizar com JSON: ' + e?.message, 'error');
+      showToast('Erro ao sincronizar com Firestore: ' + e?.message, 'error');
     } finally {
       setIsCloudSyncing(false);
     }
   };
 
-  // Puxar dados mais recentes da Nuvem Vercel / Servidor (ideal ao abrir em outro PC ou celular)
+  // Puxar dados mais recentes do Banco de Dados Firestore
   const handlePullData = async () => {
     setIsCloudSyncing(true);
     try {
-      const cloudResult = await fetchCloudData();
-      if (cloudResult.success && cloudResult.data && cloudResult.data.clients && cloudResult.data.clients.length > 0) {
-        setClients(cloudResult.data.clients);
-        if (cloudResult.data.expenses && Array.isArray(cloudResult.data.expenses)) {
-          setExpenses(cloudResult.data.expenses);
+      const result = await fetchAllFromFirestore();
+      if (result && result.clients && result.clients.length > 0) {
+        setClients(result.clients);
+        if (result.expenses && Array.isArray(result.expenses)) {
+          setExpenses(result.expenses);
         }
-        if (cloudResult.data.expenseCategories && Array.isArray(cloudResult.data.expenseCategories)) {
-          setExpCategories(cloudResult.data.expenseCategories);
+        if (result.categories && Array.isArray(result.categories)) {
+          setExpCategories(result.categories);
         }
-        showToast(`✓ Base JSON carregada da Nuvem (${cloudResult.data.clients.length} clientes atualizados)!`, 'success');
+        showToast(`✓ Base do Firestore carregada (${result.clients.length} clientes atualizados)!`, 'success');
       } else {
-        showToast(cloudResult.message || 'Nenhum dado encontrado na nuvem para puxar.', 'info');
+        showToast('Nenhum dado encontrado no banco Firestore para puxar.', 'info');
       }
     } catch (e: any) {
-      showToast('Erro ao puxar dados da nuvem: ' + e?.message, 'error');
+      showToast('Erro ao puxar dados do Firestore: ' + e?.message, 'error');
     } finally {
       setIsCloudSyncing(false);
     }
@@ -460,12 +460,12 @@ export default function App() {
     }
   };
 
-  const handleImportBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const data = JSON.parse(content);
@@ -475,23 +475,29 @@ export default function App() {
           return;
         }
 
+        let importedClients = clients;
+        let importedExpenses = expenses;
+        let importedCats = expCategories;
         let restoredAnything = false;
 
-        if (Array.isArray(data.clients)) {
+        if (Array.isArray(data.clients) && data.clients.length > 0) {
+          importedClients = data.clients;
           setClients(data.clients);
           localStorage.setItem('contr_clientes_data', JSON.stringify(data.clients));
           restoredAnything = true;
         }
 
         if (Array.isArray(data.expenses)) {
+          importedExpenses = data.expenses;
           setExpenses(data.expenses);
           localStorage.setItem('contr_clientes_expenses', JSON.stringify(data.expenses));
           restoredAnything = true;
         }
 
-        if (Array.isArray(data.expCategories)) {
-          setExpCategories(data.expCategories);
-          localStorage.setItem('contr_clientes_expense_categories', JSON.stringify(data.expCategories));
+        if (Array.isArray(data.expCategories || data.expenseCategories)) {
+          importedCats = data.expCategories || data.expenseCategories;
+          setExpCategories(importedCats);
+          localStorage.setItem('contr_clientes_expense_categories', JSON.stringify(importedCats));
           restoredAnything = true;
         }
 
@@ -507,19 +513,36 @@ export default function App() {
             isFound: true,
             lastSyncAt: new Date().toLocaleString()
           }));
-          showToast('Backup restaurado com sucesso! Dados recarregados.', 'success');
+
+          showToast('Salvando dados do JSON no Banco de Dados em Nuvem...', 'info');
+          
+          try {
+            const syncResult = await syncAllToFirestore(importedClients, importedExpenses, importedCats);
+            if (syncResult.success) {
+              showToast(`✓ JSON restaurado e gravado no Banco de Dados Cloud com sucesso (${importedClients.length} clientes)!`, 'success');
+            } else {
+              showToast(`Dados restaurados localmente. Aviso do banco: ${syncResult.message}`, 'info');
+            }
+          } catch (syncErr: any) {
+            console.error('Erro ao sincronizar com Firestore após importar backup:', syncErr);
+            showToast('JSON restaurado localmente. Erro ao gravar na nuvem: ' + syncErr?.message, 'error');
+          }
+
           setIsBackupModalOpen(false);
           setIsDbNotFoundModalOpen(false);
           setIsSettingsModalOpen(false);
         } else {
-          showToast('Nenhum dado compatível foi encontrado no arquivo.', 'error');
+          showToast('Nenhum dado compatível foi encontrado no arquivo JSON.', 'error');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao ler arquivo de backup:', err);
-        showToast('Erro ao ler arquivo JSON. Verifique o formato.', 'error');
+        showToast('Erro ao ler arquivo JSON: ' + (err?.message || 'Verifique a formatação'), 'error');
       }
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
+      }
+      if (event.target) {
+        event.target.value = '';
       }
     };
     reader.readAsText(file);
@@ -531,9 +554,10 @@ export default function App() {
   const handleSaveClient = (clientData: Omit<Client, 'id' | 'createdAt' | 'paymentHistory'> & { id?: string }) => {
     if (clientData.id) {
       // Edição
+      let updatedClient: Client | null = null;
       setClients(prev => prev.map(c => {
         if (c.id === clientData.id) {
-          return {
+          updatedClient = {
             ...c,
             name: clientData.name,
             dueDateDay: clientData.dueDateDay,
@@ -544,9 +568,13 @@ export default function App() {
             billingStartDate: clientData.billingStartDate,
             billingEndDate: clientData.billingEndDate,
           };
+          return updatedClient;
         }
         return c;
       }));
+      if (updatedClient) {
+        saveClientToFirestore(updatedClient).catch(err => console.error('Erro ao atualizar no Firestore:', err));
+      }
       showToast(`Cliente "${clientData.name}" atualizado com sucesso!`, 'success');
     } else {
       // Criação de novo cliente
@@ -565,6 +593,7 @@ export default function App() {
         billingEndDate: clientData.billingEndDate,
       };
       setClients(prev => [newClient, ...prev]);
+      saveClientToFirestore(newClient).catch(err => console.error('Erro ao salvar no Firestore:', err));
       showToast(`Cliente "${clientData.name}" cadastrado com sucesso!`, 'success');
     }
     setEditingClient(null);
@@ -581,6 +610,7 @@ export default function App() {
       cancelText: 'Cancelar',
       onConfirm: () => {
         setClients(prev => prev.filter(c => c.id !== clientId));
+        deleteClientFromFirestore(clientId).catch(err => console.error('Erro ao deletar no Firestore:', err));
         showToast(`Cliente "${name}" excluído.`, 'info');
         setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
       }
@@ -592,8 +622,10 @@ export default function App() {
     setClients(prev => prev.map(c => {
       if (c.id === clientId) {
         const newStatus = c.status === 'ativo' ? 'inativo' : 'ativo';
+        const updated = { ...c, status: newStatus as 'ativo' | 'inativo' };
+        saveClientToFirestore(updated).catch(err => console.error('Erro ao atualizar status no Firestore:', err));
         showToast(`Cliente "${c.name}" foi marcado como ${newStatus}.`, 'info');
-        return { ...c, status: newStatus };
+        return updated;
       }
       return c;
     }));
@@ -601,6 +633,7 @@ export default function App() {
 
   // Registrar pagamento para o mês selecionado
   const handleConfirmPayment = (clientId: string, yearMonth: string, paymentDate: string, amount: number) => {
+    let updatedClient: Client | null = null;
     setClients(prev => prev.map(c => {
       if (c.id === clientId) {
         // Remover duplicatas caso o usuário já tenha pago este mês por engano
@@ -618,16 +651,21 @@ export default function App() {
         const currentIssued = Array.isArray(c.issuedBillingMonths) ? [...c.issuedBillingMonths] : [];
         const updatedIssued = currentIssued.includes(yearMonth) ? currentIssued : [...currentIssued, yearMonth];
 
-        return {
+        updatedClient = {
           ...c,
           paymentHistory: newHistory,
           lastPaymentDate: lastPayDate,
           issuedBillingMonths: updatedIssued
         };
+        return updatedClient;
       }
       return c;
     }));
     
+    if (updatedClient) {
+      saveClientToFirestore(updatedClient).catch(err => console.error('Erro ao registrar pagamento no Firestore:', err));
+    }
+
     const clientObj = clients.find(c => c.id === clientId);
     if (clientObj) {
       showToast(`Recebimento de ${formatCurrency(amount)} registrado para "${clientObj.name}"!`, 'success');
@@ -645,7 +683,18 @@ export default function App() {
       ? currentIssued.filter(m => m !== yearMonth)
       : [...currentIssued, yearMonth];
 
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, issuedBillingMonths: updatedIssued } : c));
+    let updatedClient: Client | null = null;
+    setClients(prev => prev.map(c => {
+      if (c.id === clientId) {
+        updatedClient = { ...c, issuedBillingMonths: updatedIssued };
+        return updatedClient;
+      }
+      return c;
+    }));
+
+    if (updatedClient) {
+      saveClientToFirestore(updatedClient).catch(err => console.error('Erro ao atualizar emissão no Firestore:', err));
+    }
 
     if (!isCurrentlyIssued) {
       showToast(`Cobrança de "${clientObj.name}" marcada como EMITIDA para ${formatYearMonth(yearMonth)}! 📄✓`, 'success');
@@ -656,20 +705,32 @@ export default function App() {
 
   // Marcar/Desmarcar todas as cobranças do mês selecionado em lote
   const handleBatchSetBillingIssued = (yearMonth: string, setIssued: boolean) => {
-    setClients(prev => prev.map(c => {
-      const currentStatus = getClientStatusForMonth(c, yearMonth, TODAY_STR);
-      if (currentStatus === 'sem_cobranca' || c.status === 'inativo') return c;
+    const updatedList: Client[] = [];
+    setClients(prev => {
+      const next = prev.map(c => {
+        const currentStatus = getClientStatusForMonth(c, yearMonth, TODAY_STR);
+        if (currentStatus === 'sem_cobranca' || c.status === 'inativo') return c;
 
-      const currentIssued = Array.isArray(c.issuedBillingMonths) ? [...c.issuedBillingMonths] : [];
-      const hasMonth = currentIssued.includes(yearMonth);
+        const currentIssued = Array.isArray(c.issuedBillingMonths) ? [...c.issuedBillingMonths] : [];
+        const hasMonth = currentIssued.includes(yearMonth);
 
-      if (setIssued && !hasMonth) {
-        return { ...c, issuedBillingMonths: [...currentIssued, yearMonth] };
-      } else if (!setIssued && hasMonth) {
-        return { ...c, issuedBillingMonths: currentIssued.filter(m => m !== yearMonth) };
-      }
-      return c;
-    }));
+        let newClient = c;
+        if (setIssued && !hasMonth) {
+          newClient = { ...c, issuedBillingMonths: [...currentIssued, yearMonth] };
+        } else if (!setIssued && hasMonth) {
+          newClient = { ...c, issuedBillingMonths: currentIssued.filter(m => m !== yearMonth) };
+        }
+        if (newClient !== c) {
+          updatedList.push(newClient);
+        }
+        return newClient;
+      });
+      return next;
+    });
+
+    for (const c of updatedList) {
+      saveClientToFirestore(c).catch(err => console.error('Erro ao sincronizar cobrança no Firestore:', err));
+    }
 
     if (setIssued) {
       showToast(`Todas as cobranças de ${formatYearMonth(yearMonth)} foram marcadas como EMITIDAS!`, 'success');
@@ -691,6 +752,7 @@ export default function App() {
       confirmText: 'Estornar Recebimento',
       cancelText: 'Cancelar',
       onConfirm: () => {
+        let updatedClient: Client | null = null;
         setClients(prev => prev.map(c => {
           if (c.id === clientId) {
             const updatedHistory = c.paymentHistory.filter(p => p.yearMonth !== yearMonth);
@@ -698,14 +760,18 @@ export default function App() {
             const sortedHistory = [...updatedHistory].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
             const newLastPaymentDate = sortedHistory.length > 0 ? sortedHistory[0].paymentDate : undefined;
             
-            return {
+            updatedClient = {
               ...c,
               paymentHistory: updatedHistory,
               lastPaymentDate: newLastPaymentDate
             };
+            return updatedClient;
           }
           return c;
         }));
+        if (updatedClient) {
+          saveClientToFirestore(updatedClient).catch(err => console.error('Erro ao estornar no Firestore:', err));
+        }
         showToast('Pagamento revertido com sucesso.', 'info');
         setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
       }
@@ -735,9 +801,10 @@ export default function App() {
 
     if (expId) {
       // Edição de despesa existente
+      let updatedExp: Expense | null = null;
       setExpenses(prev => prev.map(item => {
         if (item.id === expId) {
-          return {
+          updatedExp = {
             ...item,
             description: expDescription.trim(),
             category: expCategory,
@@ -747,9 +814,13 @@ export default function App() {
             yearMonth: expYearMonth,
             notes: expNotes.trim()
           };
+          return updatedExp;
         }
         return item;
       }));
+      if (updatedExp) {
+        saveExpenseToFirestore(updatedExp).catch(err => console.error('Erro ao atualizar despesa no Firestore:', err));
+      }
       showToast(`Despesa "${expDescription}" atualizada com sucesso!`, 'success');
     } else {
       // Nova Despesa
@@ -764,6 +835,7 @@ export default function App() {
         notes: expNotes.trim()
       };
       setExpenses(prev => [newExp, ...prev]);
+      saveExpenseToFirestore(newExp).catch(err => console.error('Erro ao salvar despesa no Firestore:', err));
       showToast(`Despesa "${expDescription}" lançada com sucesso!`, 'success');
     }
 
@@ -803,6 +875,7 @@ export default function App() {
       cancelText: 'Cancelar',
       onConfirm: () => {
         setExpenses(prev => prev.filter(e => e.id !== expenseId));
+        deleteExpenseFromFirestore(expenseId).catch(err => console.error('Erro ao deletar despesa no Firestore:', err));
         showToast(`Despesa "${desc}" excluída com sucesso.`, 'info');
         setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
         // Se a despesa excluída for a que está sob edição, limpar o form
@@ -1058,18 +1131,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Cabeçalho Superior Executivo com Perfil, Backup e Status de Nuvem */}
+      {/* Cabeçalho Superior Executivo com Perfil, Tema e Configurações */}
       <TopHeader 
         user={currentUser}
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-        onQuickBackup={handleQuickBackup}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onLogout={handleLogout}
         onOpenSyncTab={() => setActiveTab('sync')}
-        isSyncing={isCloudSyncing}
-        onTriggerSync={handleManualSync}
-        onPullFromCloud={handlePullData}
       />
 
       {/* Banner Informativo Superior (estilo da imagem com botão de fechar) */}
