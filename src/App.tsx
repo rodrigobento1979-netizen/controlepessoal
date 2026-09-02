@@ -318,12 +318,36 @@ export default function App() {
     try {
       const res = await syncDataToCloud(clients, expenses, expCategories, dbConfig, currentUser.name, currentUser.email);
       if (res.success) {
-        showToast('✓ Dados gravados no JSON do sistema e sincronizados com sucesso!', 'success');
+        showToast('✓ Dados gravados no JSON do sistema e sincronizados com a Vercel!', 'success');
       } else {
         showToast('Aviso: ' + res.message, 'info');
       }
     } catch (e: any) {
       showToast('Erro ao sincronizar com JSON: ' + e?.message, 'error');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  // Puxar dados mais recentes da Nuvem Vercel / Servidor (ideal ao abrir em outro PC ou celular)
+  const handlePullData = async () => {
+    setIsCloudSyncing(true);
+    try {
+      const cloudResult = await fetchCloudData();
+      if (cloudResult.success && cloudResult.data && cloudResult.data.clients && cloudResult.data.clients.length > 0) {
+        setClients(cloudResult.data.clients);
+        if (cloudResult.data.expenses && Array.isArray(cloudResult.data.expenses)) {
+          setExpenses(cloudResult.data.expenses);
+        }
+        if (cloudResult.data.expenseCategories && Array.isArray(cloudResult.data.expenseCategories)) {
+          setExpCategories(cloudResult.data.expenseCategories);
+        }
+        showToast(`✓ Base JSON carregada da Nuvem (${cloudResult.data.clients.length} clientes atualizados)!`, 'success');
+      } else {
+        showToast(cloudResult.message || 'Nenhum dado encontrado na nuvem para puxar.', 'info');
+      }
+    } catch (e: any) {
+      showToast('Erro ao puxar dados da nuvem: ' + e?.message, 'error');
     } finally {
       setIsCloudSyncing(false);
     }
@@ -1045,6 +1069,7 @@ export default function App() {
         onOpenSyncTab={() => setActiveTab('sync')}
         isSyncing={isCloudSyncing}
         onTriggerSync={handleManualSync}
+        onPullFromCloud={handlePullData}
       />
 
       {/* Banner Informativo Superior (estilo da imagem com botão de fechar) */}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { 
   Cloud, 
   Download, 
+  Upload,
   RefreshCw, 
   Sun, 
   Moon, 
@@ -13,7 +14,9 @@ import {
   HelpCircle,
   CheckCircle2,
   Database,
-  Smartphone
+  Smartphone,
+  ArrowDownToLine,
+  ArrowUpFromLine
 } from 'lucide-react';
 import { UserAuth } from '../types';
 
@@ -28,6 +31,7 @@ interface TopHeaderProps {
   isSyncing?: boolean;
   lastSyncTime?: string;
   onTriggerSync?: () => void;
+  onPullFromCloud?: () => void;
 }
 
 export default function TopHeader({
@@ -41,6 +45,7 @@ export default function TopHeader({
   isSyncing = false,
   lastSyncTime,
   onTriggerSync,
+  onPullFromCloud,
 }: TopHeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -73,14 +78,28 @@ export default function TopHeader({
 
           {/* Versão mobile: Ações Rápidas de Topo */}
           <div className="flex items-center gap-1.5 md:hidden">
+            {onPullFromCloud && (
+              <button
+                type="button"
+                id="mobile-pull-cloud-header-btn"
+                onClick={onPullFromCloud}
+                disabled={isSyncing}
+                className="p-2 rounded-lg bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 active:scale-95 transition-transform"
+                title="Puxar dados mais recentes da Nuvem Vercel"
+              >
+                <ArrowDownToLine className={`w-4 h-4 ${isSyncing ? 'animate-bounce' : ''}`} />
+              </button>
+            )}
             {onTriggerSync && (
               <button
                 type="button"
+                id="mobile-push-cloud-header-btn"
                 onClick={onTriggerSync}
+                disabled={isSyncing}
                 className="p-2 rounded-lg bg-purple-500/25 text-purple-200 border border-purple-400/30 active:scale-95 transition-transform"
-                title="Sincronizar dados agora"
+                title="Enviar e salvar na Nuvem Vercel"
               >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+                <ArrowUpFromLine className={`w-4 h-4 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
               </button>
             )}
             <button
@@ -105,21 +124,47 @@ export default function TopHeader({
         {/* Direita: Ações Rápidas, Status de Nuvem, Tema e Perfil */}
         <div className="hidden md:flex items-center flex-wrap justify-end gap-2 w-full md:w-auto">
           
-          {/* Status e Gatilho de Sincronização com Nuvem / Vercel */}
+          {/* Botão 1: Puxar da Nuvem Vercel (Carrega o que foi feito no outro computador / celular) */}
+          {onPullFromCloud && (
+            <button
+              type="button"
+              id="header-pull-cloud-btn"
+              onClick={onPullFromCloud}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-xs font-bold text-emerald-200 hover:text-emerald-100 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Puxar dados salvos na nuvem da Vercel (ideal para quando você abre o sistema em outro computador ou celular)"
+            >
+              <ArrowDownToLine className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <span>Puxar da Nuvem</span>
+            </button>
+          )}
+
+          {/* Botão 2: Enviar para Nuvem Vercel (Salva e sincroniza agora) */}
+          {onTriggerSync && (
+            <button
+              type="button"
+              id="header-push-cloud-btn"
+              onClick={onTriggerSync}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/90 hover:bg-purple-500 border border-purple-400/50 text-xs font-bold text-white transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Enviar dados atuais para a Nuvem da Vercel para estarem disponíveis em outros aparelhos"
+            >
+              <ArrowUpFromLine className={`w-3.5 h-3.5 text-purple-200 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>Enviar p/ Nuvem</span>
+            </button>
+          )}
+
+          {/* Botão Central de Nuvem Vercel (Abre a aba completa) */}
           <button
             type="button"
             id="cloud-status-header-btn"
-            onClick={onTriggerSync || onOpenSyncTab}
-            disabled={isSyncing}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-900/70 border border-purple-500/30 hover:border-purple-400 text-xs font-semibold text-purple-100 hover:bg-purple-800/70 transition-all cursor-pointer shadow-sm group"
-            title="Clique para sincronizar com a Vercel ou abrir a Central de Nuvem"
+            onClick={onOpenSyncTab}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-900/50 border border-purple-500/30 hover:border-purple-400 text-xs font-semibold text-purple-100 hover:bg-purple-800/70 transition-all cursor-pointer shadow-sm group"
+            title="Abrir Central de Sincronização e Gerenciamento JSON"
           >
-            <div className="relative flex items-center justify-center">
-              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin text-emerald-300' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-            </div>
-            <span className="text-[11px]">Nuvem Vercel:</span>
+            <Cloud className="w-3.5 h-3.5 text-purple-300" />
             <span className="text-[11px] font-bold text-emerald-300">
-              {isSyncing ? 'Sincronizando...' : 'Conectada (Auto-Sync)'}
+              {isSyncing ? 'Sincronizando...' : 'Nuvem Vercel'}
             </span>
           </button>
 
@@ -129,10 +174,10 @@ export default function TopHeader({
             id="quick-backup-btn"
             onClick={onQuickBackup}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold text-white transition-all cursor-pointer shadow-sm"
-            title="Fazer download imediato do backup JSON da sua máquina"
+            title="Fazer download imediato do backup JSON para este computador"
           >
             <Download className="w-3.5 h-3.5 text-purple-300" />
-            <span className="hidden lg:inline">Baixar</span> Backup (.JSON)
+            <span className="hidden lg:inline">Baixar</span> .JSON
           </button>
 
           {/* Botão Alternar Tema */}
