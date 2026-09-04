@@ -205,12 +205,9 @@ export default function App() {
   const [expPayerFilter, setExpPayerFilter] = useState<string>('todos');
   const [expShowAllMonths, setExpShowAllMonths] = useState(false);
 
-  // Sincronizar categorias de despesas no localStorage e no Firestore
+  // Sincronizar categorias de despesas no localStorage
   useEffect(() => {
     localStorage.setItem('contr_clientes_expense_categories', JSON.stringify(expCategories));
-    saveCategoriesToFirestore(expCategories).catch(err => {
-      console.warn('Sincronização de categorias com Firestore:', err);
-    });
   }, [expCategories]);
 
   // Tema (light / dark)
@@ -271,7 +268,10 @@ export default function App() {
     const unsubscribeFirestore = subscribeToFirestore(
       async (remoteClients) => {
         if (remoteClients && remoteClients.length > 0) {
-          setClients(remoteClients);
+          setClients(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(remoteClients)) return prev;
+            return remoteClients;
+          });
         } else if (isInitialFetch) {
           // Se o Firestore estiver vazio pela primeira vez, faz o seed automático com os dados locais
           const localClients = getInitialClients();
@@ -283,12 +283,20 @@ export default function App() {
       },
       (remoteExpenses) => {
         if (remoteExpenses && remoteExpenses.length > 0) {
-          setExpenses(remoteExpenses);
+          setExpenses(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(remoteExpenses)) return prev;
+            return remoteExpenses;
+          });
         }
       },
       (remoteCategories) => {
         if (remoteCategories && remoteCategories.length > 0) {
-          setExpCategories(remoteCategories);
+          setExpCategories(prev => {
+            if (prev.length === remoteCategories.length && prev.every((c, i) => c === remoteCategories[i])) {
+              return prev;
+            }
+            return remoteCategories;
+          });
         }
       },
       (error) => {
@@ -1862,7 +1870,11 @@ export default function App() {
                 showToast(`A categoria "${formattedName}" já existe.`, 'error');
                 return;
               }
-              setExpCategories(prev => [...prev, formattedName]);
+              const updatedCats = [...expCategories, formattedName];
+              setExpCategories(updatedCats);
+              saveCategoriesToFirestore(updatedCats).catch(err => {
+                console.warn('Erro ao salvar categoria no Firestore:', err);
+              });
               setNewCategoryName('');
               showToast(`Categoria "${formattedName}" adicionada com sucesso!`, 'success');
             }} className="space-y-4 mb-5">
@@ -1916,7 +1928,11 @@ export default function App() {
                           return;
                         }
 
-                        setExpCategories(prev => prev.filter(c => c !== cat));
+                        const updatedCats = expCategories.filter(c => c !== cat);
+                        setExpCategories(updatedCats);
+                        saveCategoriesToFirestore(updatedCats).catch(err => {
+                          console.warn('Erro ao salvar categorias no Firestore:', err);
+                        });
                         showToast(`Categoria "${cat}" removida.`, 'info');
                       }}
                       className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg theme-text-secondary transition-colors cursor-pointer"

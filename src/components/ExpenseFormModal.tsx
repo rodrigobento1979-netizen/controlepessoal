@@ -41,12 +41,15 @@ export default function ExpenseFormModal({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
+  // Sincronizar dados APENAS quando o modal abre ou quando o item a editar muda
   useEffect(() => {
+    if (!isOpen) return;
+
     if (expenseToEdit) {
-      setDescription(expenseToEdit.description);
+      setDescription(expenseToEdit.description || '');
       setCategory(expenseToEdit.category || categories[0] || 'Geral');
       setPayer(expenseToEdit.payer || 'Rodrigo');
-      setValue(String(expenseToEdit.value));
+      setValue(expenseToEdit.value != null ? String(expenseToEdit.value) : '');
       setPaymentDate(expenseToEdit.paymentDate || todayStr);
       setYearMonth(expenseToEdit.yearMonth || defaultYearMonth);
       setNotes(expenseToEdit.notes || '');
@@ -61,7 +64,7 @@ export default function ExpenseFormModal({
       setNotes('');
       setError('');
     }
-  }, [expenseToEdit, isOpen, categories, defaultYearMonth, todayStr]);
+  }, [expenseToEdit, isOpen]);
 
   if (!isOpen) return null;
 
@@ -71,9 +74,10 @@ export default function ExpenseFormModal({
       setError('Informe a descrição da despesa.');
       return;
     }
-    const numValue = parseFloat(value.replace(',', '.'));
+    const cleanVal = value.trim().replace(/\s/g, '').replace(',', '.');
+    const numValue = parseFloat(cleanVal);
     if (isNaN(numValue) || numValue <= 0) {
-      setError('Insira um valor válido maior que zero.');
+      setError('Insira um valor válido maior que zero (Ex: 150,00 ou 150.00).');
       return;
     }
 
@@ -95,7 +99,11 @@ export default function ExpenseFormModal({
     <div 
       id="expense-form-modal-backdrop" 
       className="fixed inset-0 theme-modal-backdrop backdrop-blur-md flex justify-center items-center z-50 p-3 sm:p-4 transition-all animate-fade-in"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div 
         id="expense-form-modal-card" 
@@ -151,7 +159,6 @@ export default function ExpenseFormModal({
                 setDescription(e.target.value);
                 if (error) setError('');
               }}
-              autoFocus
             />
           </div>
 
@@ -252,13 +259,12 @@ export default function ExpenseFormModal({
               <input
                 id="exp-input-date"
                 type="date"
-                inputMode="numeric"
                 required
-                className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
+                className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
                 value={paymentDate}
                 onChange={(e) => {
                   setPaymentDate(e.target.value);
-                  if (e.target.value) {
+                  if (e.target.value && e.target.value.length >= 7) {
                     const ym = e.target.value.substring(0, 7);
                     setYearMonth(ym);
                   }
@@ -273,9 +279,8 @@ export default function ExpenseFormModal({
               <input
                 id="exp-input-yearmonth"
                 type="month"
-                inputMode="numeric"
                 required
-                className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
+                className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
                 value={yearMonth}
                 onChange={(e) => setYearMonth(e.target.value)}
               />
