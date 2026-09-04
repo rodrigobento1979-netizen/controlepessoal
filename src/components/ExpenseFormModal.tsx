@@ -315,7 +315,7 @@ export default function ExpenseFormModal({
             <button
               id="exp-save-btn"
               type="submit"
-              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
             >
               {expenseToEdit ? 'Atualizar Despesa' : 'Confirmar Lançamento'}
             </button>

@@ -1507,7 +1507,7 @@ export default function App() {
                         setEditingExpense(null);
                         setIsExpenseModalOpen(true);
                       }}
-                      className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      className="py-1.5 px-3 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
                       <span>Nova Despesa</span>

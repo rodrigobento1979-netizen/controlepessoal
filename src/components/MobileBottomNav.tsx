@@ -121,12 +121,12 @@ export default function MobileBottomNav({
           onClick={() => onSelectTab('sync')}
           className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all min-h-[42px] cursor-pointer ${
             activeTab === 'sync'
-              ? 'text-orange-400 bg-orange-500/15 font-bold shadow-inner'
+              ? 'text-emerald-400 bg-emerald-500/15 font-bold shadow-inner'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <div className="relative">
-            <Database className={`w-4.5 h-4.5 ${isSyncing ? 'animate-bounce text-orange-400' : ''}`} />
+            <Database className={`w-4.5 h-4.5 ${isSyncing ? 'animate-bounce text-emerald-400' : ''}`} />
             <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-emerald-400"></span>
           </div>
           <span className="text-[9px] mt-0.5 font-medium tracking-tight">Banco</span>
