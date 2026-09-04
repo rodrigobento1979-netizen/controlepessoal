@@ -84,14 +84,14 @@ const TODAY_STR = '2026-06-04';
 // Retorna uma classe de cores pastel estável e determinística com base no nome do tipo da categoria
 const getCategoryColorClass = (category: string) => {
   const colors = [
-    'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/15',
-    'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/15',
-    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/15',
-    'bg-rose-500/10 text-rose-600 dark:text-rose-450 border-rose-500/15',
-    'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/15',
-    'bg-indigo-500/10 text-indigo-150 dark:text-indigo-400 border-indigo-500/15',
-    'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/15',
-    'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/15',
+    'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30',
+    'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+    'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30',
+    'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30',
+    'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30',
+    'bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-500/30',
+    'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30',
   ];
   
   let hash = 0;
@@ -1425,26 +1425,26 @@ export default function App() {
                 <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 font-bold shrink-0 self-start">Saídas</span>
               </div>
 
-              {/* Totalizador por Responsável */}
-              <div className="theme-card rounded-xl p-3 border flex items-center justify-between" style={{ borderColor: 'var(--card-border)' }}>
-                <div className="flex items-center gap-2.5 w-full">
+              {/* Totalizador por Responsável (Quem Pagou) */}
+              <div className="theme-card rounded-xl p-3 border flex items-center justify-between relative" style={{ borderColor: 'var(--card-border)' }}>
+                <div className="flex items-center gap-2.5 min-w-0">
                   <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg border border-indigo-500/10 shrink-0">
                     <Users className="w-4 h-4" />
                   </div>
-                  <div className="w-full">
+                  <div className="min-w-0">
                     <span className="text-[9px] uppercase font-bold theme-text-secondary block tracking-wider">Quem Pagou</span>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      <div className="bg-sky-500/10 border border-sky-500/20 rounded-md px-2 py-1">
-                        <span className="text-[8px] font-extrabold text-sky-600 dark:text-sky-400 uppercase block leading-none">Rodrigo (Abate)</span>
-                        <span className="text-xs font-black text-sky-700 dark:text-sky-300">{formatCurrency(expenseTotalsInSelectedMonth.rodrigoTotal)}</span>
-                      </div>
-                      <div className="bg-pink-500/10 border border-pink-500/20 rounded-md px-2 py-1">
-                        <span className="text-[8px] font-extrabold text-pink-600 dark:text-pink-400 uppercase block leading-none">Aryadner</span>
-                        <span className="text-xs font-black text-pink-700 dark:text-pink-300">{formatCurrency(expenseTotalsInSelectedMonth.aryadnerTotal)}</span>
-                      </div>
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold mt-0.5 flex-wrap">
+                      <span className="text-sky-600 dark:text-sky-400">
+                        R: {formatCurrency(expenseTotalsInSelectedMonth.rodrigoTotal)}
+                      </span>
+                      <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">e</span>
+                      <span className="text-pink-600 dark:text-pink-400">
+                        A: {formatCurrency(expenseTotalsInSelectedMonth.aryadnerTotal)}
+                      </span>
                     </div>
                   </div>
                 </div>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 font-bold shrink-0 self-start">Divisão</span>
               </div>
 
               {/* Resultado Líquido (Receitas - Despesas Rodrigo) */}
@@ -1550,21 +1550,21 @@ export default function App() {
                           id="search-expenses-input"
                           type="text"
                           placeholder="Pesquisar despesas..."
-                          className="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400 font-medium"
+                          className="w-full pl-8 pr-3 py-1.5 theme-input rounded-lg text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 transition-all placeholder-slate-400"
                           value={expSearchQuery}
                           onChange={(e) => setExpSearchQuery(e.target.value)}
                         />
                       </div>
 
                       {/* Filtro por Quem Pagou */}
-                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 p-0.5 rounded-lg shrink-0">
+                      <div className="flex items-center gap-1 theme-card border p-0.5 rounded-lg shrink-0" style={{ borderColor: 'var(--card-border)' }}>
                         <button
                           type="button"
                           id="filter-payer-todos"
                           onClick={() => setExpPayerFilter('todos')}
                           className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
                             expPayerFilter === 'todos'
-                              ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xs'
+                              ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                               : 'theme-text-secondary hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
@@ -1611,9 +1611,10 @@ export default function App() {
                             onClick={() => setExpCategoryFilter(cat)}
                             className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
                               isSelected
-                                ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500 dark:text-white border-indigo-200 dark:border-indigo-500 shadow-xs'
-                                : 'bg-slate-100 dark:bg-white/5 border-slate-200/60 dark:border-white/10 theme-text-secondary hover:bg-slate-200 dark:hover:bg-white/10'
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : 'theme-card border theme-text-secondary hover:text-slate-900 dark:hover:text-white'
                             }`}
+                            style={!isSelected ? { borderColor: 'var(--card-border)' } : undefined}
                           >
                             {cat === 'todos' ? 'Categorias' : cat}
                           </button>
@@ -1644,51 +1645,61 @@ export default function App() {
                           <div
                             id={`expense-item-${exp.id}`}
                             key={exp.id}
-                            className={`p-2.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all hover:translate-x-[2px] bg-slate-50/50 dark:bg-white/2 ${
-                              editingExpense?.id === exp.id ? 'ring-2 ring-amber-400 border-transparent dark:ring-amber-500' : 'border-slate-200/50 dark:border-white/5'
+                            className={`theme-card rounded-lg p-2 sm:p-2.5 px-3 border flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 transition-all duration-150 hover:scale-[1.002] shadow-2xs ${
+                              (exp.payer || 'Rodrigo') === 'Aryadner'
+                                ? 'border-l-[3.5px] border-l-pink-500'
+                                : 'border-l-[3.5px] border-l-rose-500'
+                            } ${
+                              editingExpense?.id === exp.id ? 'ring-2 ring-amber-400 dark:ring-amber-500' : ''
                             }`}
+                            style={{ borderColor: 'var(--card-border)' }}
                           >
-                            <div className="space-y-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="text-xs font-black theme-title truncate max-w-xs sm:max-w-md" title={exp.description}>
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className="font-extrabold text-xs sm:text-sm theme-title truncate max-w-[200px] sm:max-w-md" title={exp.description}>
                                   {exp.description}
                                 </h4>
-                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold border ${categoryColorClass}`}>
+                                <span className={`px-1.5 py-0.2 rounded-md text-[8.5px] font-black tracking-wider uppercase border ${categoryColorClass}`}>
                                   {exp.category}
                                 </span>
                                 {(exp.payer || 'Rodrigo') === 'Aryadner' ? (
-                                  <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20 flex items-center gap-1" title="Pago por Aryadner (não abate do saldo recebido)">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
+                                  <span className="px-1.5 py-0.2 rounded-md text-[8.5px] font-black tracking-wider uppercase bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1" title="Pago por Aryadner">
+                                    <span className="w-1 h-1 rounded-full bg-pink-500"></span>
                                     Aryadner
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center gap-1" title="Pago por Rodrigo (abate do saldo recebido)">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                  <span className="px-1.5 py-0.2 rounded-md text-[8.5px] font-black tracking-wider uppercase bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center gap-1" title="Pago por Rodrigo (abate do saldo)">
+                                    <span className="w-1 h-1 rounded-full bg-sky-500"></span>
                                     Rodrigo
                                   </span>
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] theme-text-secondary font-medium">
-                                <span>Ref: <strong className="theme-text-primary">{formattedExpMonth}</strong></span>
-                                <span className="h-1 w-1 rounded-full bg-slate-450/40"></span>
-                                <span>Pago em: <strong className="theme-text-primary">{formatDate(exp.paymentDate)}</strong></span>
+                              <div className="flex flex-wrap items-center gap-x-2 text-[10px] theme-text-secondary leading-none">
+                                <span>Ref: <strong className="theme-text-primary font-bold">{formattedExpMonth}</strong></span>
+                                <span className="theme-text-muted">•</span>
+                                <span>Pago: <strong className="theme-text-primary font-semibold">{formatDate(exp.paymentDate)}</strong></span>
                                 {exp.notes && (
                                   <>
-                                    <span className="h-1 w-1 rounded-full bg-slate-450/40"></span>
-                                    <span className="italic truncate max-w-[150px] sm:max-w-[220px]" title={exp.notes}>"{exp.notes}"</span>
+                                    <span className="theme-text-muted">•</span>
+                                    <span className="italic truncate max-w-[140px] sm:max-w-xs text-slate-400 dark:text-slate-400" title={exp.notes}>
+                                      "{exp.notes}"
+                                    </span>
                                   </>
                                 )}
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-0 pt-2 sm:pt-0 border-slate-200 dark:border-white/5">
-                              <div className="sm:text-right">
-                                <span className="text-[9px] font-bold theme-text-secondary uppercase tracking-wider block leading-none">Custo Pago</span>
-                                <span className="text-xs font-black text-rose-500 dark:text-rose-455">{formatCurrency(exp.value)}</span>
+                            <div 
+                              className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3.5 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-0"
+                              style={{ borderColor: 'var(--card-border)' }}
+                            >
+                              <div className="text-right">
+                                <span className="text-[8.5px] font-bold theme-text-secondary uppercase tracking-wider block leading-none">Custo</span>
+                                <span className="text-xs sm:text-sm font-extrabold text-rose-600 dark:text-rose-400 block mt-0.5">{formatCurrency(exp.value)}</span>
                               </div>
 
-                              <div className="flex items-center gap-1 pl-2 border-l border-slate-200/60 dark:border-white/5">
+                              <div className="flex items-center gap-0.5 pl-1.5 sm:pl-2 border-l" style={{ borderColor: 'var(--card-border)' }}>
                                 <button
                                   id={`edit-expense-btn-${exp.id}`}
                                   type="button"
@@ -1696,7 +1707,7 @@ export default function App() {
                                     setEditingExpense(exp);
                                     setIsExpenseModalOpen(true);
                                   }}
-                                  className="p-1.5 hover:bg-amber-500/10 hover:text-amber-500 rounded-lg theme-text-secondary transition-colors cursor-pointer"
+                                  className="p-1 hover:bg-amber-500/10 text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 rounded-md transition-colors cursor-pointer"
                                   title="Editar lançamento de despesa"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
@@ -1705,7 +1716,7 @@ export default function App() {
                                   id={`delete-expense-btn-${exp.id}`}
                                   type="button"
                                   onClick={() => handleDeleteExpense(exp.id, exp.description)}
-                                  className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg theme-text-secondary transition-colors cursor-pointer"
+                                  className="p-1 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-md transition-colors cursor-pointer"
                                   title="Excluir lançamento de despesa"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1911,7 +1922,7 @@ export default function App() {
                 {expCategories.map((cat) => (
                   <div 
                     key={cat}
-                    className="p-2.5 rounded-xl border flex items-center justify-between text-xs font-bold theme-text-primary bg-slate-50/50 dark:bg-white/1"
+                    className="p-2.5 rounded-xl border flex items-center justify-between text-xs font-bold theme-text-primary theme-card"
                     style={{ borderColor: 'var(--card-border)' }}
                   >
                     <div className="flex items-center gap-2">
