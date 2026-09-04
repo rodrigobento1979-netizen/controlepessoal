@@ -89,42 +89,44 @@ export default function ClientFormModal({
   };
 
   return (
-    <div id="client-form-modal-backdrop" className="fixed inset-0 theme-modal-backdrop backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all animate-fade-in">
+    <div id="client-form-modal-backdrop" className="fixed inset-0 theme-modal-backdrop backdrop-blur-md flex justify-center items-center z-50 p-3 sm:p-4 transition-all animate-fade-in" onClick={onClose}>
       <div 
         id="client-form-modal-card" 
-        className="theme-modal rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100"
+        className="theme-modal rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col transform transition-all duration-300"
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-6 py-4 theme-modal-header flex justify-between items-center">
+        {/* Header Compacto */}
+        <div className="px-4 py-2.5 theme-modal-header flex justify-between items-center border-b" style={{ borderColor: 'var(--card-border)' }}>
           <div>
-            <h3 className="text-base font-bold theme-title">
-              {clientToEdit ? 'Editar Dados do Cliente' : 'Cadastrar Novo Cliente'}
+            <h3 className="text-sm font-bold theme-title">
+              {clientToEdit ? 'Editar Cliente' : 'Cadastrar Cliente'}
             </h3>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              {clientToEdit ? 'Altere as informações de faturamento do cliente' : 'Adicione um novo cliente e defina suas regras de cobrança'}
+            <p className="text-[10px] theme-text-secondary">
+              {clientToEdit ? 'Altere os dados de faturamento' : 'Adicione um novo cliente e vencimento'}
             </p>
           </div>
           <button 
             id="close-form-modal"
+            type="button"
             onClick={onClose}
-            className="p-1.5 hover:bg-slate-500/10 theme-text-secondary hover:theme-title rounded-lg transition-colors cursor-pointer"
+            className="p-1 hover:bg-slate-500/10 theme-text-secondary hover:theme-title rounded-lg transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content / Form */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 flex-1 space-y-4">
+        {/* Content / Form Compacto */}
+        <form onSubmit={handleSubmit} className="p-3.5 space-y-2.5 text-xs">
           
           {/* Nome */}
           <div>
-            <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1.5 select-none">
-              <User className="w-3.5 h-3.5 text-indigo-500" /> Nome Completo / Empresa *
+            <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 flex items-center gap-1 select-none">
+              <User className="w-3 h-3 text-indigo-500" /> Nome Completo / Empresa *
             </label>
             <input
               id="input-name"
               type="text"
-              className={`w-full px-4 py-2.5 theme-input rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-semibold transition-all placeholder-slate-400 ${
+              className={`w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder-slate-400 ${
                 errors.name ? 'border-red-500 focus:ring-red-500/30' : ''
               }`}
               placeholder="Ex: Sorveteria Central ou João da Silva"
@@ -133,24 +135,24 @@ export default function ClientFormModal({
                 setName(e.target.value);
                 if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
               }}
+              autoFocus
             />
-            {errors.name && <p className="text-[11px] text-rose-500 mt-1 font-semibold">{errors.name}</p>}
+            {errors.name && <p className="text-[10px] text-rose-500 mt-0.5 font-semibold">{errors.name}</p>}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2.5">
             {/* Valor */}
             <div>
-              <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1.5 select-none">
-                <DollarSign className="w-3.5 h-3.5 text-indigo-500" /> Valor Mensal (R$) *
+              <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 flex items-center gap-1 select-none">
+                <DollarSign className="w-3 h-3 text-indigo-500" /> Valor Mensal (R$) *
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 theme-text-muted text-sm font-bold">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-muted text-xs font-bold">R$</span>
                 <input
                   id="input-value"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className={`w-full pl-10 pr-4 py-2.5 theme-input rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-bold transition-all placeholder-slate-400 ${
+                  type="text"
+                  inputMode="decimal"
+                  className={`w-full pl-8 pr-3 py-1.5 theme-input rounded-xl text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder-slate-400 ${
                     errors.value ? 'border-red-500 focus:ring-red-500/30' : ''
                   }`}
                   placeholder="250,00"
@@ -161,20 +163,22 @@ export default function ClientFormModal({
                   }}
                 />
               </div>
-              {errors.value && <p className="text-[11px] text-rose-500 mt-1 font-semibold">{errors.value}</p>}
+              {errors.value && <p className="text-[10px] text-rose-500 mt-0.5 font-semibold">{errors.value}</p>}
             </div>
 
             {/* Dia do Vencimento */}
             <div>
-              <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1.5 select-none">
-                <Calendar className="w-3.5 h-3.5 text-indigo-500" /> Dia de Vencimento *
+              <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 flex items-center gap-1 select-none">
+                <Calendar className="w-3 h-3 text-indigo-500" /> Dia Vencimento *
               </label>
               <input
                 id="input-due-date-day"
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 min="1"
                 max="31"
-                className={`w-full px-4 py-2.5 theme-input rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-bold transition-all placeholder-slate-400 [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none ${
+                className={`w-full px-3 py-1.5 theme-input rounded-xl text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder-slate-400 [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none ${
                   errors.dueDateDay ? 'border-red-500 focus:ring-red-500/30' : ''
                 }`}
                 placeholder="Ex: 10"
@@ -184,112 +188,101 @@ export default function ClientFormModal({
                   if (errors.dueDateDay) setErrors(prev => ({ ...prev, dueDateDay: '' }));
                 }}
               />
-              <p className="text-[10px] theme-text-muted mt-1">Dia do vencimento recorrente (1-31)</p>
-              {errors.dueDateDay && <p className="text-[11px] text-rose-500 mt-1 font-semibold">{errors.dueDateDay}</p>}
+              {errors.dueDateDay && <p className="text-[10px] text-rose-500 mt-0.5 font-semibold">{errors.dueDateDay}</p>}
             </div>
           </div>
 
-          {/* Tipo de Contrato */}
+          {/* Tipo de Cobrança: Recorrente (Verde) e Mensal (Azul) sem explicações */}
           <div>
-            <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-2 select-none">
-              Tipo de Cobrança / Contrato
+            <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 select-none">
+              Tipo de Cobrança
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 id="type-recorrente-btn"
                 type="button"
                 onClick={() => setContractType('recorrente')}
-                className={`p-3 rounded-xl border text-sm font-semibold flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                className={`py-2 px-3 rounded-xl border text-xs font-black tracking-wider uppercase flex items-center justify-center cursor-pointer transition-all ${
                   contractType === 'recorrente'
-                    ? 'border-indigo-500 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 ring-1 ring-indigo-500'
-                    : 'theme-btn-secondary'
+                    ? 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500 shadow-sm'
+                    : 'theme-btn-secondary opacity-70 hover:opacity-100 hover:border-emerald-500/50'
                 }`}
               >
-                <span>Recorrente</span>
-                <span className="text-[10px] font-normal opacity-85 text-center">Fatura todo mês automaticamente</span>
+                RECORRENTE
               </button>
               
               <button
                 id="type-mensal-btn"
                 type="button"
                 onClick={() => setContractType('mensal')}
-                className={`p-3 rounded-xl border text-sm font-semibold flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                className={`py-2 px-3 rounded-xl border text-xs font-black tracking-wider uppercase flex items-center justify-center cursor-pointer transition-all ${
                   contractType === 'mensal'
-                    ? 'border-indigo-500 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 ring-1 ring-indigo-500'
-                    : 'theme-btn-secondary'
+                    ? 'border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500 shadow-sm'
+                    : 'theme-btn-secondary opacity-70 hover:opacity-100 hover:border-blue-500/50'
                 }`}
               >
-                <span>Mensal</span>
-                <span className="text-[10px] font-normal opacity-85 text-center">Contrato avulso / faturado manualmente</span>
+                MENSAL
               </button>
             </div>
           </div>
 
-          {/* Período de Faturamento (Início e Fim) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Início da Cobrança */}
+          {/* Período de Faturamento Compacto */}
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1.5 select-none">
-                <Calendar className="w-3.5 h-3.5 text-indigo-500" /> Início das Cobranças (Opcional)
+              <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 flex items-center gap-1 select-none">
+                <Calendar className="w-3 h-3 text-indigo-500" /> Início Cobrança
               </label>
               <input
                 id="input-billing-start-date"
                 type="month"
-                className="w-full px-4 py-2.5 theme-input rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-semibold transition-all"
+                inputMode="numeric"
+                className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
                 value={billingStartDate}
                 onChange={(e) => setBillingStartDate(e.target.value)}
               />
-              <p className="text-[10px] theme-text-muted mt-1">
-                Deixe vazio para cobrar imediatamente.
-              </p>
             </div>
 
-            {/* Término da Cobrança */}
             <div>
-              <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1.5 select-none">
-                <Calendar className="w-3.5 h-3.5 text-rose-500" /> Término das Cobranças (Opcional)
+              <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 flex items-center gap-1 select-none">
+                <Calendar className="w-3 h-3 text-rose-500" /> Término Cobrança
               </label>
               <input
                 id="input-billing-end-date"
                 type="month"
-                className="w-full px-4 py-2.5 theme-input rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-semibold transition-all"
+                inputMode="numeric"
+                className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
                 value={billingEndDate}
                 onChange={(e) => setBillingEndDate(e.target.value)}
               />
-              <p className="text-[10px] theme-text-muted mt-1">
-                Deixe vazio para cobrar continuamente.
-              </p>
             </div>
           </div>
-          <p className="text-[10px] theme-text-secondary -mt-2">
-            Perfeito para contratos temporários ou sazonais: por exemplo, configurando Junho como Início e Julho como Término, as cobranças ocorrerão apenas nesses dois meses.
-          </p>
 
           {/* Observações */}
           <div>
-            <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1.5 select-none">
-              <FileText className="w-3.5 h-3.5 text-indigo-500" /> Observações (Opcional)
+            <label className="block text-[10px] font-bold theme-text-primary uppercase tracking-wider mb-1 flex items-center gap-1 select-none">
+              <FileText className="w-3 h-3 text-indigo-500" /> Observações (Opcional)
             </label>
-            <textarea
+            <input
               id="input-notes"
-              className="w-full px-4 py-2.5 theme-input rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-normal min-h-[80px] max-h-[150px] placeholder-slate-400"
-              placeholder="Ex: Paga sempre via Pix, contato principal: Sandra..."
+              type="text"
+              className="w-full px-3 py-1.5 theme-input rounded-xl text-xs font-normal focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder-slate-400 transition-all"
+              placeholder="Ex: Paga via Pix, contato: Sandra..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
 
-          {/* Estado de Ativo (Somente para edição) */}
+          {/* Estado de Ativo / Inativo (Edição) */}
           {clientToEdit && (
-            <div className="pt-2 flex items-center gap-3">
-              <label className="block text-xs font-bold theme-text-primary uppercase tracking-wider select-none">
-                Situação do Cliente:
-              </label>
-              <div className="flex gap-2">
+            <div className="pt-1 flex items-center justify-between">
+              <span className="text-[10px] font-bold theme-text-primary uppercase tracking-wider select-none">
+                Situação:
+              </span>
+              <div className="flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => onSave({ ...clientToEdit, status: 'ativo', name, dueDateDay, value: parseFloat(value) || 0, contractType, notes })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  onClick={() => onSave({ ...clientToEdit, status: 'ativo', name, dueDateDay: Number(dueDateDay), value: parseFloat(value) || 0, contractType, notes, billingStartDate: billingStartDate || undefined, billingEndDate: billingEndDate || undefined })}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                     clientToEdit.status === 'ativo'
                       ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30'
                       : 'theme-btn-secondary'
@@ -299,8 +292,8 @@ export default function ClientFormModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSave({ ...clientToEdit, status: 'inativo', name, dueDateDay, value: parseFloat(value) || 0, contractType, notes })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  onClick={() => onSave({ ...clientToEdit, status: 'inativo', name, dueDateDay: Number(dueDateDay), value: parseFloat(value) || 0, contractType, notes, billingStartDate: billingStartDate || undefined, billingEndDate: billingEndDate || undefined })}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                     clientToEdit.status === 'inativo'
                       ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30'
                       : 'theme-btn-secondary'
@@ -314,24 +307,24 @@ export default function ClientFormModal({
 
         </form>
 
-        {/* Footer */}
-        <div className="px-6 py-4 theme-modal-footer flex justify-end gap-3">
+        {/* Footer Compacto */}
+        <div className="px-4 py-2.5 theme-modal-footer flex justify-end gap-2 border-t" style={{ borderColor: 'var(--card-border)' }}>
           <button
             id="cancel-form-btn"
             type="button"
             onClick={onClose}
-            className="px-4 py-2 theme-btn-secondary rounded-xl font-semibold text-sm transition-all cursor-pointer"
+            className="px-3 py-1.5 theme-btn-secondary rounded-xl font-semibold text-xs transition-all cursor-pointer"
           >
-            Ir para trás / Fechar
+            Cancelar
           </button>
           
           <button
             id="save-client-btn"
             type="button"
             onClick={handleSubmit}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center"
+            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center"
           >
-            {clientToEdit ? 'Salvar Alterações' : 'Cadastrar Cliente'}
+            {clientToEdit ? 'Salvar Alterações' : 'Cadastrar'}
           </button>
         </div>
       </div>

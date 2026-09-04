@@ -80,12 +80,12 @@ export default function ClientDetailModal({
         <div className="px-5 sm:px-6 py-4 theme-modal-header flex justify-between items-start border-b shrink-0">
           <div className="flex-1 pr-3">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                 client.contractType === 'recorrente'
-                  ? 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-300 border border-indigo-500/25'
-                  : 'bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-300 border border-fuchsia-500/25'
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                  : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
               }`}>
-                {client.contractType === 'recorrente' ? 'Recorrente' : 'Mensal'}
+                {client.contractType === 'recorrente' ? 'RECORRENTE' : 'MENSAL'}
               </span>
 
               {client.status === 'inativo' && (

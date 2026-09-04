@@ -62,6 +62,76 @@ const MONTHS_SHORT = [
   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
 ];
 
+// Custom Tooltip para o Gráfico de Fluxo Diário
+const CustomDailyTooltip = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  if (!data) return null;
+
+  return (
+    <div 
+      className="p-3 rounded-xl border shadow-2xl text-xs space-y-2 min-w-[250px] max-w-xs backdrop-blur-md transition-all"
+      style={{
+        backgroundColor: 'var(--card-bg, #ffffff)',
+        borderColor: 'var(--card-border, #e2e8f0)',
+        color: 'var(--text-primary, #0f172a)'
+      }}
+    >
+      <div className="border-b pb-1.5 flex items-center justify-between" style={{ borderColor: 'var(--card-border, #e2e8f0)' }}>
+        <span className="font-extrabold text-xs">Dia {data.dateLabel}</span>
+        <span className="text-[10px] opacity-75 font-mono">{data.dateStr}</span>
+      </div>
+
+      <div className="space-y-1">
+        {data.previsaoRecebimento > 0 && (
+          <div className="flex justify-between items-center text-amber-500 font-semibold text-[11px]">
+            <span>Previsão (Contratos):</span>
+            <span className="font-bold">{formatCurrency(data.previsaoRecebimento)}</span>
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+          <span>Recebimentos Pagos:</span>
+          <span className="font-bold">+{formatCurrency(data.recebimentos)}</span>
+        </div>
+
+        <div className="flex justify-between items-center text-rose-500 font-semibold text-[11px]">
+          <span>Despesas Pagas (Dia):</span>
+          <span className="font-bold">-{formatCurrency(data.despesas)}</span>
+        </div>
+
+        {data.despesas > 0 && (
+          <div className="pl-2 border-l border-slate-300 dark:border-slate-700 text-[10px] opacity-80 space-y-0.5">
+            <div className="flex justify-between">
+              <span>• Rodrigo (abate saldo):</span>
+              <span className="font-semibold text-sky-600 dark:text-sky-400">-{formatCurrency(data.despesasRodrigo)}</span>
+            </div>
+            {data.despesasAryadner > 0 && (
+              <div className="flex justify-between">
+                <span>• Aryadner (só computar):</span>
+                <span className="font-semibold text-pink-500">-{formatCurrency(data.despesasAryadner)}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Saldo Acumulado em destaque */}
+      <div className="pt-2 border-t flex flex-col gap-0.5" style={{ borderColor: 'var(--card-border, #e2e8f0)' }}>
+        <div className="flex justify-between items-center">
+          <span className="font-black text-[11px]">Saldo Acumulado:</span>
+          <span className={`font-black text-xs ${data.saldoAcumulado >= 0 ? 'text-blue-500 dark:text-blue-400' : 'text-rose-500'}`}>
+            {formatCurrency(data.saldoAcumulado)}
+          </span>
+        </div>
+        <p className="text-[9px] opacity-70 italic leading-tight">
+          (Recebimentos - Despesas de Rodrigo acumulados até este dia)
+        </p>
+      </div>
+    </div>
+  );
+};
+
 export default function DashboardView({
   clients,
   expenses,
@@ -190,24 +260,26 @@ export default function DashboardView({
 
     // 2. Processar Pagamentos Recebidos e Pagamentos Pendentes de Clientes no Mês
     clients.forEach((client) => {
-      const payment = client.paymentHistory.find((p) => p.yearMonth === selectedMonth);
-      if (payment) {
-        // Obter dia do pagamento
-        const payDateParts = payment.paymentDate.split('-');
-        let payDay = parseInt(payDateParts[2], 10);
-        if (isNaN(payDay) || payDay < 1 || payDay > daysInMonth) {
-          payDay = client.dueDateDay > daysInMonth ? daysInMonth : client.dueDateDay;
-        }
+      const payments = client.paymentHistory.filter((p) => p.yearMonth === selectedMonth);
+      if (payments.length > 0) {
+        payments.forEach((payment) => {
+          // Obter dia do pagamento
+          const payDateParts = payment.paymentDate.split('-');
+          let payDay = parseInt(payDateParts[2], 10);
+          if (isNaN(payDay) || payDay < 1 || payDay > daysInMonth) {
+            payDay = client.dueDateDay > daysInMonth ? daysInMonth : client.dueDateDay;
+          }
 
-        const bucket = map.get(payDay);
-        if (bucket) {
-          bucket.recebimentos += payment.amount;
-          bucket.detalhesRecebimentos.push({
-            cliente: client.name,
-            valor: payment.amount,
-            pago: true,
-          });
-        }
+          const bucket = map.get(payDay);
+          if (bucket) {
+            bucket.recebimentos += payment.amount;
+            bucket.detalhesRecebimentos.push({
+              cliente: client.name,
+              valor: payment.amount,
+              pago: true,
+            });
+          }
+        });
       } else {
         // Cliente ainda não pagou: adicionar como previsão pendente no dia de vencimento
         const status = getClientStatusForMonth(client, selectedMonth, `${year}-12-31`);
@@ -713,68 +785,37 @@ export default function DashboardView({
                 <BarChart data={dailyFlowData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={theme === 'dark' ? 0.1 : 0.2} />
                   <XAxis dataKey="dayNum" stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickLine={false} tickFormatter={(val) => `${val}`} />
-                  <YAxis stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickFormatter={(val) => `R$${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} />
-                  <Tooltip 
-                    formatter={(value: any, name: any) => [formatCurrency(Number(value)), name]}
-                    labelFormatter={(label) => `Dia ${label}/${selMonthStr}`}
-                    contentStyle={{ 
-                      backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff', 
-                      borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-                      borderRadius: '0.75rem',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                    }}
-                  />
+                  <YAxis stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickFormatter={(val) => `R${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} />
+                  <Tooltip content={<CustomDailyTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Bar dataKey="previsaoRecebimento" name="Previsão de Recebimento" fill="#f97316" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="recebimentos" name="Recebimentos Pagos" fill="#10b981" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="despesas" name="Despesas Pagas" fill="#f43f5e" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="saldoDia" name="Saldo do Dia" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="saldoAcumulado" name="Saldo Acumulado (Rodrigo)" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                 </BarChart>
               ) : chartType === 'line' ? (
                 <LineChart data={dailyFlowData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={theme === 'dark' ? 0.1 : 0.2} />
                   <XAxis dataKey="dayNum" stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickLine={false} />
-                  <YAxis stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickFormatter={(val) => `R$${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} />
-                  <Tooltip 
-                    formatter={(value: any, name: any) => [formatCurrency(Number(value)), name]}
-                    labelFormatter={(label) => `Dia ${label}/${selMonthStr}`}
-                    contentStyle={{ 
-                      backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff', 
-                      borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-                      borderRadius: '0.75rem',
-                      fontSize: '11px',
-                      fontWeight: 600
-                    }}
-                  />
+                  <YAxis stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickFormatter={(val) => `R${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} />
+                  <Tooltip content={<CustomDailyTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Line type="monotone" dataKey="previsaoRecebimento" name="Previsão de Recebimento" stroke="#f97316" strokeWidth={3} dot={{ r: 3.5, fill: '#f97316' }} />
                   <Line type="monotone" dataKey="recebimentos" name="Recebimentos Pagos" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="despesas" name="Despesas Pagas" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado" stroke="#3b82f6" strokeWidth={3} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado (Rodrigo)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 3 }} />
                 </LineChart>
               ) : (
                 <ComposedChart data={dailyFlowData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={theme === 'dark' ? 0.1 : 0.2} />
                   <XAxis dataKey="dayNum" stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickLine={false} tickFormatter={(val) => `${val}`} />
-                  <YAxis stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickFormatter={(val) => `R$${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} />
-                  <Tooltip 
-                    formatter={(value: any, name: any) => [formatCurrency(Number(value)), name]}
-                    labelFormatter={(label) => `Dia ${label}/${selMonthStr}`}
-                    contentStyle={{ 
-                      backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff', 
-                      borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-                      borderRadius: '0.75rem',
-                      fontSize: '11px',
-                      fontWeight: 600
-                    }}
-                  />
+                  <YAxis stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} fontSize={10} tickFormatter={(val) => `R${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} />
+                  <Tooltip content={<CustomDailyTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Bar dataKey="recebimentos" name="Recebimentos Pagos" fill="#10b981" radius={[3, 3, 0, 0]} barSize={12} />
                   <Bar dataKey="despesas" name="Despesas Pagas" fill="#f43f5e" radius={[3, 3, 0, 0]} barSize={12} />
                   <Line type="monotone" dataKey="previsaoRecebimento" name="Previsão de Recebimento" stroke="#f97316" strokeWidth={2.8} dot={{ r: 3.5, fill: '#f97316' }} />
-                  <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 2 }} />
+                  <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado (Rodrigo)" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 2 }} />
                 </ComposedChart>
               )
             ) : (
@@ -875,7 +916,7 @@ export default function DashboardView({
                   <th className="py-2 px-2.5 text-emerald-500">Recebimentos Efetivados</th>
                   <th className="py-2 px-2.5 text-rose-500">Despesas Pagas</th>
                   <th className="py-2 px-2.5">Saldo do Dia</th>
-                  <th className="py-2 px-2.5 text-right">Saldo Acumulado</th>
+                  <th className="py-2 px-2.5 text-right">Saldo Acumulado (Rodrigo)</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-medium" style={{ borderColor: 'var(--card-border)' }}>

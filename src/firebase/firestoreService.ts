@@ -84,13 +84,19 @@ export async function deleteExpenseFromFirestore(expenseId: string): Promise<voi
  */
 export async function saveCategoriesToFirestore(categories: string[]): Promise<void> {
   try {
-    const docRef = doc(db, 'settings', 'expenseCategories');
-    await setDoc(docRef, {
+    const docRef1 = doc(db, 'settings', 'systemConfig');
+    const docRef2 = doc(db, 'settings', 'expenseCategories');
+    const payload = {
       categories,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    await Promise.all([
+      setDoc(docRef1, payload, { merge: true }),
+      setDoc(docRef2, payload, { merge: true }),
+    ]);
   } catch (error) {
     console.error('Erro ao salvar categorias no Firestore:', error);
+    throw error;
   }
 }
 

@@ -33,7 +33,9 @@ import {
   CheckSquare,
   Square,
   CheckCheck,
-  ChevronRight
+  ChevronRight,
+  Tag,
+  Receipt
 } from 'lucide-react';
 import { Client, Expense, AppTab, DatabaseConfig, UserAuth } from './types';
 import { 
@@ -45,7 +47,8 @@ import {
   getDueDateForMonth,
   getInitialExpenses,
   formatYearMonth,
-  isBillingIssuedForMonth
+  isBillingIssuedForMonth,
+  getRealCurrentYearMonth
 } from './utils/clientHelpers';
 import { downloadBackupFile, syncDataToCloud, scheduleAutoSync, fetchCloudData, subscribeToSyncBroadcast } from './utils/cloudSync';
 import { 
@@ -73,6 +76,7 @@ import VercelSyncView from './components/VercelSyncView';
 import MobileBottomNav from './components/MobileBottomNav';
 import ClientDetailModal from './components/ClientDetailModal';
 import { ClientCard } from './components/ClientCard';
+import ExpenseFormModal from './components/ExpenseFormModal';
 
 // Data de "hoje" ancorada de acordo com o ambiente da aplicação (Junho de 2026)
 const TODAY_STR = '2026-06-04';
@@ -138,16 +142,23 @@ export default function App() {
     return getInitialClients();
   });
 
-  const [selectedYearMonth, setSelectedYearMonth] = useState('2026-06');
+  const [selectedYearMonth, setSelectedYearMonth] = useState(() => getRealCurrentYearMonth());
   const [filterDueDate, setFilterDueDate] = useState<string>('todos');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'pago' | 'pendente' | 'atrasado'>('todos');
   const [sortBy, setSortBy] = useState<'vencimento' | 'nome' | 'padrao'>('vencimento');
 
   // --- Estados do Módulo e Navegação ---
   const [activeTab, setActiveTab] = useState<AppTab>('clientes');
-  const [dashboardYear, setDashboardYear] = useState<number>(2026);
+  const [dashboardYear, setDashboardYear] = useState<number>(() => {
+    const ym = getRealCurrentYearMonth();
+    return parseInt(ym.split('-')[0], 10) || 2026;
+  });
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isDbNotFoundModalOpen, setIsDbNotFoundModalOpen] = useState(false);
+
+  // Modal de Lançamento/Edição de Despesas
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   // Configurações do Banco de Dados JSON Local
   const [dbConfig, setDbConfig] = useState<DatabaseConfig>(() => {
@@ -188,41 +199,19 @@ export default function App() {
     return getInitialExpenses();
   });
 
-  // Campos de Formulário de Despesa
-  const [expId, setExpId] = useState<string | null>(null);
-  const [expDescription, setExpDescription] = useState('');
-  const [expCategory, setExpCategory] = useState(() => {
-    // Inicializar com o primeiro elemento disponível, ou fallback
-    const savedCats = localStorage.getItem('contr_clientes_expense_categories');
-    if (savedCats) {
-      try {
-        const parsed = JSON.parse(savedCats);
-        if (parsed && parsed.length > 0) return parsed[0];
-      } catch (e) {}
-    }
-    return 'Infraestrutura';
-  });
-  const [expPayer, setExpPayer] = useState<'Rodrigo' | 'Aryadner'>('Rodrigo');
-  const [expValue, setExpValue] = useState('');
-  const [expPaymentDate, setExpPaymentDate] = useState(TODAY_STR);
-  const [expYearMonth, setExpYearMonth] = useState('2026-06');
-  const [expNotes, setExpNotes] = useState('');
-
   // Filtros de busca de despesas
   const [expSearchQuery, setExpSearchQuery] = useState('');
   const [expCategoryFilter, setExpCategoryFilter] = useState<string>('todos');
   const [expPayerFilter, setExpPayerFilter] = useState<string>('todos');
   const [expShowAllMonths, setExpShowAllMonths] = useState(false);
 
-  // Sincronizar categorias de despesas no localStorage
+  // Sincronizar categorias de despesas no localStorage e no Firestore
   useEffect(() => {
     localStorage.setItem('contr_clientes_expense_categories', JSON.stringify(expCategories));
+    saveCategoriesToFirestore(expCategories).catch(err => {
+      console.warn('Sincronização de categorias com Firestore:', err);
+    });
   }, [expCategories]);
-
-  // Sincronizar mês do formulário com o mês global selecionado
-  useEffect(() => {
-    setExpYearMonth(selectedYearMonth);
-  }, [selectedYearMonth]);
 
   // Tema (light / dark)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -779,92 +768,6 @@ export default function App() {
   };
 
   // --- Operações de Despesas ---
-  const handleSaveExpense = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expDescription.trim()) {
-      showToast('Digite a descrição da despesa.', 'error');
-      return;
-    }
-    const valNum = Number(expValue);
-    if (!expValue || isNaN(valNum) || valNum <= 0) {
-      showToast('Insira um valor válido de despesa.', 'error');
-      return;
-    }
-    if (!expYearMonth) {
-      showToast('Selecione o mês de referência.', 'error');
-      return;
-    }
-    if (!expPaymentDate) {
-      showToast('Selecione a data de pagamento.', 'error');
-      return;
-    }
-
-    if (expId) {
-      // Edição de despesa existente
-      let updatedExp: Expense | null = null;
-      setExpenses(prev => prev.map(item => {
-        if (item.id === expId) {
-          updatedExp = {
-            ...item,
-            description: expDescription.trim(),
-            category: expCategory,
-            payer: expPayer,
-            value: valNum,
-            paymentDate: expPaymentDate,
-            yearMonth: expYearMonth,
-            notes: expNotes.trim()
-          };
-          return updatedExp;
-        }
-        return item;
-      }));
-      if (updatedExp) {
-        saveExpenseToFirestore(updatedExp).catch(err => console.error('Erro ao atualizar despesa no Firestore:', err));
-      }
-      showToast(`Despesa "${expDescription}" atualizada com sucesso!`, 'success');
-    } else {
-      // Nova Despesa
-      const newExp: Expense = {
-        id: `exp-${Date.now()}`,
-        description: expDescription.trim(),
-        category: expCategory,
-        payer: expPayer,
-        value: valNum,
-        paymentDate: expPaymentDate,
-        yearMonth: expYearMonth,
-        notes: expNotes.trim()
-      };
-      setExpenses(prev => [newExp, ...prev]);
-      saveExpenseToFirestore(newExp).catch(err => console.error('Erro ao salvar despesa no Firestore:', err));
-      showToast(`Despesa "${expDescription}" lançada com sucesso!`, 'success');
-    }
-
-    // Resetar campos
-    setExpId(null);
-    setExpDescription('');
-    setExpCategory(expCategories[0] || 'Outros');
-    setExpPayer('Rodrigo');
-    setExpValue('');
-    setExpNotes('');
-  };
-
-  const handleEditExpenseInline = (exp: Expense) => {
-    setExpId(exp.id);
-    setExpDescription(exp.description);
-    setExpCategory(exp.category);
-    setExpPayer(exp.payer || 'Rodrigo');
-    setExpValue(String(exp.value));
-    setExpPaymentDate(exp.paymentDate);
-    setExpYearMonth(exp.yearMonth);
-    setExpNotes(exp.notes || '');
-    
-    // Rola para o topo do formulário no celular
-    const formEl = document.getElementById('expense-form-card');
-    if (formEl) {
-      formEl.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   const handleDeleteExpense = (expenseId: string, desc: string) => {
     setConfirmModalConfig({
       isOpen: true,
@@ -878,24 +781,64 @@ export default function App() {
         deleteExpenseFromFirestore(expenseId).catch(err => console.error('Erro ao deletar despesa no Firestore:', err));
         showToast(`Despesa "${desc}" excluída com sucesso.`, 'info');
         setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
-        // Se a despesa excluída for a que está sob edição, limpar o form
-        if (expId === expenseId) {
-          setExpId(null);
-          setExpDescription('');
-          setExpCategory(expCategories[0] || 'Outros');
-          setExpValue('');
-          setExpNotes('');
+        if (editingExpense && editingExpense.id === expenseId) {
+          setEditingExpense(null);
+          setIsExpenseModalOpen(false);
         }
       }
     });
   };
 
-  const handleCancelEditExpense = () => {
-    setExpId(null);
-    setExpDescription('');
-    setExpCategory(expCategories[0] || 'Outros');
-    setExpValue('');
-    setExpNotes('');
+  // Salvar ou Atualizar Despesa via Modal Compacto
+  const handleSaveExpenseModal = (expenseData: {
+    id?: string;
+    description: string;
+    category: string;
+    payer: 'Rodrigo' | 'Aryadner';
+    value: number;
+    paymentDate: string;
+    yearMonth: string;
+    notes?: string;
+  }) => {
+    if (expenseData.id) {
+      let updatedExp: Expense | null = null;
+      setExpenses(prev => prev.map(item => {
+        if (item.id === expenseData.id) {
+          updatedExp = {
+            id: expenseData.id!,
+            description: expenseData.description,
+            category: expenseData.category,
+            payer: expenseData.payer,
+            value: expenseData.value,
+            paymentDate: expenseData.paymentDate,
+            yearMonth: expenseData.yearMonth,
+            notes: expenseData.notes
+          };
+          return updatedExp;
+        }
+        return item;
+      }));
+      if (updatedExp) {
+        saveExpenseToFirestore(updatedExp).catch(err => console.error('Erro ao atualizar despesa no Firestore:', err));
+      }
+      showToast(`Despesa "${expenseData.description}" atualizada com sucesso!`, 'success');
+    } else {
+      const newExp: Expense = {
+        id: `exp-${Date.now()}`,
+        description: expenseData.description,
+        category: expenseData.category,
+        payer: expenseData.payer,
+        value: expenseData.value,
+        paymentDate: expenseData.paymentDate,
+        yearMonth: expenseData.yearMonth,
+        notes: expenseData.notes
+      };
+      setExpenses(prev => [newExp, ...prev]);
+      saveExpenseToFirestore(newExp).catch(err => console.error('Erro ao salvar despesa no Firestore:', err));
+      showToast(`Despesa "${expenseData.description}" lançada com sucesso!`, 'success');
+    }
+    setIsExpenseModalOpen(false);
+    setEditingExpense(null);
   };
 
   // --- Processamento de Estatísticas Financeiras ---
@@ -1177,11 +1120,8 @@ export default function App() {
             setIsClientModalOpen(true);
           }}
           onOpenNewExpenseModal={() => {
-            setActiveTab('despesas');
-            setExpId(null);
-            setExpDescription('');
-            setExpValue('');
-            setExpNotes('');
+            setEditingExpense(null);
+            setIsExpenseModalOpen(true);
           }}
           onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
           clientsCount={clients.length}
@@ -1536,237 +1476,48 @@ export default function App() {
               </div>
             </div>
 
-            {/* Layout em Duas Colunas */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-              
-              {/* Formulário de Despesa (Col Esquerda) */}
-              <div id="expense-form-card" className="lg:col-span-5 flex flex-col gap-3 scroll-mt-20">
-                <div className="theme-card rounded-xl p-3.5 border transition-all duration-300" style={{ borderColor: 'var(--card-border)' }}>
-                  <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: 'var(--card-border)' }}>
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg border ${
-                        expId 
-                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
-                          : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                      }`}>
-                        {expId ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-bold theme-title">
-                          {expId ? 'Editar Despesa' : 'Lançar Nova Despesa'}
-                        </h3>
-                        <p className="text-[10px] theme-text-secondary mt-0.5">
-                          {expId ? 'Atualize as informações da despesa' : 'Registre uma despesa ou custo operacional'}
-                        </p>
-                      </div>
-                    </div>
-                    {expId && (
-                      <button
-                        type="button"
-                        onClick={handleCancelEditExpense}
-                        className="py-1 px-2 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-[10px] font-bold theme-text-secondary cursor-pointer transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                  </div>
-
-                  <form onSubmit={handleSaveExpense} className="space-y-2.5">
-                    {/* Descrição */}
-                    <div>
-                      <label htmlFor="exp-description-input" className="block text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-1 select-none font-mono">
-                        Descrição da Despesa
-                      </label>
-                      <input
-                        id="exp-description-input"
-                        type="text"
-                        placeholder="Ex: Aluguel, Internet, Licença Canva..."
-                        required
-                        className="w-full px-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-semibold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 transition-all placeholder-slate-400"
-                        value={expDescription}
-                        onChange={(e) => setExpDescription(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Categoria e Valor */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label htmlFor="exp-category-select" className="text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider select-none font-mono">
-                            Categoria
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setIsCategoryModalOpen(true)}
-                            className="text-[9px] text-indigo-500 hover:text-indigo-400 font-extrabold flex items-center gap-0.5 cursor-pointer hover:underline"
-                            title="Gerenciar categorias de despesas"
-                          >
-                            + Gerenciar
-                          </button>
-                        </div>
-                        <select
-                          id="exp-category-select"
-                          value={expCategory}
-                          onChange={(e) => setExpCategory(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-semibold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 transition-all cursor-pointer"
-                        >
-                          {expCategories.map(cat => (
-                            <option key={cat} value={cat} className="dark:bg-slate-900">{cat}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label htmlFor="exp-value-input" className="block text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-1 select-none font-mono">
-                          Valor da Despesa
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">R$</span>
-                          <input
-                            id="exp-value-input"
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            placeholder="0,00"
-                            required
-                            className="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-black text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 transition-all placeholder-slate-400"
-                            value={expValue}
-                            onChange={(e) => setExpValue(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Mês de Referência e Data de Vencimento */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <div>
-                        <label htmlFor="exp-month-input" className="block text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-1 select-none font-mono">
-                          Mês de Referência
-                        </label>
-                        <input
-                          id="exp-month-input"
-                          type="month"
-                          required
-                          className="w-full px-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-semibold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 transition-all"
-                          value={expYearMonth}
-                          onChange={(e) => setExpYearMonth(e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="exp-date-input" className="block text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-1 select-none font-mono">
-                          Data do Pagamento
-                        </label>
-                        <input
-                          id="exp-date-input"
-                          type="date"
-                          required
-                          className="w-full px-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-semibold text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 transition-all"
-                          value={expPaymentDate}
-                          onChange={(e) => setExpPaymentDate(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Quem Pagou a Despesa (Rodrigo ou Aryadner) */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider select-none font-mono">
-                          Quem pagou a despesa?
-                        </label>
-                        <span className="text-[9px] theme-text-secondary font-medium">
-                          {expPayer === 'Rodrigo' ? 'Abate do saldo recebido' : 'Não abate do saldo recebido'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          id="payer-rodrigo-btn"
-                          type="button"
-                          onClick={() => setExpPayer('Rodrigo')}
-                          className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                            expPayer === 'Rodrigo'
-                              ? 'bg-sky-500 text-white border-sky-600 shadow-sm'
-                              : 'bg-slate-100 dark:bg-white/5 border-slate-200/80 dark:border-white/10 theme-text-secondary hover:bg-slate-200 dark:hover:bg-white/10'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${expPayer === 'Rodrigo' ? 'bg-white' : 'bg-sky-500'}`}></span>
-                          Rodrigo
-                        </button>
-
-                        <button
-                          id="payer-aryadner-btn"
-                          type="button"
-                          onClick={() => setExpPayer('Aryadner')}
-                          className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                            expPayer === 'Aryadner'
-                              ? 'bg-pink-500 text-white border-pink-600 shadow-sm'
-                              : 'bg-slate-100 dark:bg-white/5 border-slate-200/80 dark:border-white/10 theme-text-secondary hover:bg-slate-200 dark:hover:bg-white/10'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${expPayer === 'Aryadner' ? 'bg-white' : 'bg-pink-500'}`}></span>
-                          Aryadner
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Observações */}
-                    <div>
-                      <label htmlFor="exp-notes-textarea" className="block text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-1 select-none font-mono">
-                        Observações (Opcional)
-                      </label>
-                      <textarea
-                        id="exp-notes-textarea"
-                        placeholder="Adicione informações extras desta despesa..."
-                        rows={2}
-                        className="w-full px-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-medium text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 transition-all placeholder-slate-400 resize-none font-sans"
-                        value={expNotes}
-                        onChange={(e) => setExpNotes(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Botão de Envio */}
-                    <button
-                      id="exp-submit-btn"
-                      type="submit"
-                      className={`w-full py-2 px-4 text-white rounded-lg font-bold text-xs select-none shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
-                        expId
-                          ? 'bg-amber-500 hover:bg-amber-400 shadow-amber-500/10'
-                          : 'bg-indigo-500 hover:bg-indigo-400 shadow-indigo-500/10'
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5" /> 
-                      {expId ? 'Atualizar Registro' : 'Registrar lançamento'}
-                    </button>
-                  </form>
-                </div>
-
-                {/* Ajuda / Dica */}
-                <div className="theme-card rounded-xl p-3 border flex items-start gap-2 transition-all" style={{ backgroundColor: 'var(--baixa-bg)', borderColor: 'var(--baixa-border)' }}>
-                  <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-bold theme-title">Mapeamento e Fluxo de Caixa</h4>
-                    <p className="text-[10px] theme-text-secondary leading-relaxed font-semibold">
-                      Lançar suas despesas permite analisar o resultado operacional líquido e o fluxo real em tempo real contra as mensalidades faturadas.
+            {/* Listagem de Despesas Cadastradas (Largura Total sem formulário aberto fixo) */}
+            <div className="w-full flex flex-col gap-3">
+              <div className="theme-card rounded-xl p-3.5 border flex flex-col h-full min-h-[380px] transition-all duration-300" style={{ borderColor: 'var(--card-border)' }}>
+                
+                {/* Cabeçalho */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-2.5 mb-3" style={{ borderColor: 'var(--card-border)' }}>
+                  <div>
+                    <h3 className="text-sm font-bold theme-title flex items-center gap-2">
+                      <span>Histórico Geral de Despesas</span>
+                    </h3>
+                    <p className="text-[11px] theme-text-secondary mt-0.5 font-medium">
+                      {expShowAllMonths ? 'Todas as despesas catalogadas no histórico' : `Filtrando referências de ${selectedYearMonth.split('-')[1]}/${selectedYearMonth.split('-')[0]}`}
                     </p>
                   </div>
-                </div>
-              </div>
 
-              {/* Listagem de Despesas Cadastradas (Col Direita) */}
-              <div className="lg:col-span-7 flex flex-col gap-3">
-                <div className="theme-card rounded-xl p-3.5 border flex flex-col h-full min-h-[380px] transition-all duration-300" style={{ borderColor: 'var(--card-border)' }}>
-                  
-                  {/* Cabeçalho */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-2 mb-3" style={{ borderColor: 'var(--card-border)' }}>
-                    <div>
-                      <h3 className="text-xs font-bold theme-title">Histórico Geral de Despesas</h3>
-                      <p className="text-[10px] theme-text-secondary mt-0.5 font-medium">
-                        {expShowAllMonths ? 'Todas as despesas catalogadas' : `Filtrando referências de ${selectedYearMonth.split('-')[1]}/${selectedYearMonth.split('-')[0]}`}
-                      </p>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      id="open-expense-modal-btn"
+                      onClick={() => {
+                        setEditingExpense(null);
+                        setIsExpenseModalOpen(true);
+                      }}
+                      className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Nova Despesa</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="manage-expense-categories-btn"
+                      onClick={() => setIsCategoryModalOpen(true)}
+                      className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      title="Gerenciar Categorias de Despesas"
+                    >
+                      <Tag className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Categorias</span>
+                    </button>
 
                     {/* Filtro do Mês */}
-                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none ml-1">
                       <input
                         id="checkbox-all-months-expenses"
                         type="checkbox"
@@ -1774,9 +1525,10 @@ export default function App() {
                         onChange={(e) => setExpShowAllMonths(e.target.checked)}
                         className="rounded border-slate-350 dark:border-white/10 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-slate-100 dark:bg-white/5 cursor-pointer"
                       />
-                      <span className="text-[11px] font-bold theme-text-secondary">Ver todo histórico</span>
+                      <span className="text-[11px] font-bold theme-text-secondary whitespace-nowrap">Ver todo histórico</span>
                     </label>
                   </div>
+                </div>
 
                   {/* Barra de Filtros Rápidos (Busca & Categorias & Responsável) */}
                   <div className="flex flex-col gap-2 mb-3">
@@ -1885,7 +1637,7 @@ export default function App() {
                             id={`expense-item-${exp.id}`}
                             key={exp.id}
                             className={`p-2.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all hover:translate-x-[2px] bg-slate-50/50 dark:bg-white/2 ${
-                              expId === exp.id ? 'ring-2 ring-amber-400 border-transparent dark:ring-amber-500' : 'border-slate-200/50 dark:border-white/5'
+                              editingExpense?.id === exp.id ? 'ring-2 ring-amber-400 border-transparent dark:ring-amber-500' : 'border-slate-200/50 dark:border-white/5'
                             }`}
                           >
                             <div className="space-y-1 min-w-0">
@@ -1932,7 +1684,10 @@ export default function App() {
                                 <button
                                   id={`edit-expense-btn-${exp.id}`}
                                   type="button"
-                                  onClick={() => handleEditExpenseInline(exp)}
+                                  onClick={() => {
+                                    setEditingExpense(exp);
+                                    setIsExpenseModalOpen(true);
+                                  }}
                                   className="p-1.5 hover:bg-amber-500/10 hover:text-amber-500 rounded-lg theme-text-secondary transition-colors cursor-pointer"
                                   title="Editar lançamento de despesa"
                                 >
@@ -1962,7 +1717,6 @@ export default function App() {
               <div className="h-16 lg:h-6 w-full shrink-0" aria-hidden="true" />
 
             </div>
-          </div>
         )}
       </>
     )}
@@ -1995,6 +1749,21 @@ export default function App() {
         }}
         onSave={handleSaveClient}
         clientToEdit={editingClient}
+      />
+
+      {/* Formulário Compacto de Criação/Edição de Despesas em Modal */}
+      <ExpenseFormModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => {
+          setIsExpenseModalOpen(false);
+          setEditingExpense(null);
+        }}
+        onSave={handleSaveExpenseModal}
+        expenseToEdit={editingExpense}
+        categories={expCategories}
+        onOpenManageCategories={() => setIsCategoryModalOpen(true)}
+        defaultYearMonth={selectedYearMonth}
+        todayStr={TODAY_STR}
       />
 
       {/* Confirmação de Cobrança / Recebimento */}
@@ -2322,11 +2091,8 @@ export default function App() {
           setIsClientModalOpen(true);
         }}
         onOpenNewExpenseModal={() => {
-          setActiveTab('despesas');
-          setExpId(null);
-          setExpDescription('');
-          setExpValue('');
-          setExpNotes('');
+          setEditingExpense(null);
+          setIsExpenseModalOpen(true);
         }}
         onQuickSync={handleManualSync}
         isSyncing={isCloudSyncing}

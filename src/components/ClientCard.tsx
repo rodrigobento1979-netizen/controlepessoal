@@ -79,12 +79,12 @@ export const ClientCard: React.FC<ClientCardProps> = ({
             <h4 className="font-extrabold text-xs sm:text-sm theme-title truncate">
               {client.name}
             </h4>
-            <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold shrink-0 ${
+            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black shrink-0 tracking-wider ${
               client.contractType === 'recorrente' 
-                ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20' 
-                : 'bg-fuchsia-500/15 text-fuchsia-500 border border-fuchsia-500/20'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
+                : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
             }`}>
-              {client.contractType === 'recorrente' ? 'Rec' : 'Mens'}
+              {client.contractType === 'recorrente' ? 'RECORRENTE' : 'MENSAL'}
             </span>
           </div>
 
@@ -206,12 +206,12 @@ export const ClientCard: React.FC<ClientCardProps> = ({
             </h4>
             
             {/* Tipo de Contrato Badge */}
-            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase ${
               client.contractType === 'recorrente' 
-                ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20' 
-                : 'bg-fuchsia-100 dark:bg-fuchsia-950/35 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-300/35'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
+                : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
             }`}>
-              {client.contractType === 'recorrente' ? 'Recorrente' : 'Mensal'}
+              {client.contractType === 'recorrente' ? 'RECORRENTE' : 'MENSAL'}
             </span>
 
             {/* Inativo badge */}
